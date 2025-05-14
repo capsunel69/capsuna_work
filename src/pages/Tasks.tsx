@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import {
   FormContainer,
   FormRow,
@@ -14,6 +14,10 @@ import {
   PrimaryButton,
   SecondaryButton
 } from '../components/shared/FormStyles';
+import { OverdueTag } from '../components/shared/TagStyles';
+import TaskEditForm from '../components/TaskEditForm';
+import LoadingState from '../components/shared/LoadingState';
+import ErrorMessage from '../components/shared/ErrorMessage';
 
 const TasksContainer = styled.div`
   display: grid;
@@ -124,7 +128,9 @@ const Tasks: React.FC = () => {
     toggleTaskCompletion, 
     startTimer, 
     stopTimer, 
-    activeTaskId 
+    activeTaskId,
+    isLoading,
+    error
   } = useAppContext();
   
   // Form state
@@ -132,6 +138,9 @@ const Tasks: React.FC = () => {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [dueDate, setDueDate] = useState('');
+  
+  // Edit state
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   
   // Reset form
   const resetForm = () => {
@@ -164,6 +173,25 @@ const Tasks: React.FC = () => {
     
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+  
+  // Check if task is overdue
+  const isOverdue = (task: any): boolean => {
+    return task.dueDate && !task.completed && isPast(new Date(task.dueDate));
+  };
+  
+  // Handle task edit
+  const handleEditTask = (taskId: string, updates: any) => {
+    updateTask(taskId, updates);
+    setEditingTaskId(null);
+  };
+  
+  if (isLoading) {
+    return <LoadingState message="Loading tasks..." />;
+  }
+  
+  if (error) {
+    return <ErrorMessage message={error} />;
+  }
   
   return (
     <div>
@@ -228,46 +256,64 @@ const Tasks: React.FC = () => {
           <NoTasks>No tasks yet. Add one above!</NoTasks>
         ) : (
           tasks.map(task => (
-            <TaskItem key={task.id} completed={task.completed}>
-              <input
-                type="checkbox"
-                checked={task.completed}
-                onChange={() => toggleTaskCompletion(task.id)}
-              />
-              
-              <div>
-                <TaskTitle>{task.title}</TaskTitle>
-                {task.description && <div>{task.description}</div>}
-                <TaskInfo>
-                  Priority: {task.priority}
-                  {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
-                  {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
-                </TaskInfo>
-              </div>
-              
-              <div>
-                {task.id === activeTaskId ? (
-                  <ActionButton onClick={() => stopTimer(task.id)}>Stop Timer</ActionButton>
-                ) : (
-                  !task.completed && (
+            <React.Fragment key={task.id}>
+              {editingTaskId === task.id ? (
+                <TaskEditForm 
+                  task={task} 
+                  onSave={handleEditTask} 
+                  onCancel={() => setEditingTaskId(null)} 
+                />
+              ) : (
+                <TaskItem completed={task.completed}>
+                  <input
+                    type="checkbox"
+                    checked={task.completed}
+                    onChange={() => toggleTaskCompletion(task.id)}
+                  />
+                  
+                  <div>
+                    <TaskTitle>
+                      {task.title}
+                      {isOverdue(task) && <OverdueTag>OVERDUE</OverdueTag>}
+                    </TaskTitle>
+                    {task.description && <div>{task.description}</div>}
+                    <TaskInfo>
+                      Priority: {task.priority}
+                      {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
+                      {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
+                    </TaskInfo>
+                  </div>
+                  
+                  <div>
+                    {task.id === activeTaskId ? (
+                      <ActionButton onClick={() => stopTimer(task.id)}>Stop Timer</ActionButton>
+                    ) : (
+                      !task.completed && (
+                        <ActionButton 
+                          onClick={() => startTimer(task.id)}
+                          disabled={!!activeTaskId}
+                        >
+                          Start Timer
+                        </ActionButton>
+                      )
+                    )}
+                  </div>
+                  
+                  <TaskActions>
                     <ActionButton 
-                      onClick={() => startTimer(task.id)}
-                      disabled={!!activeTaskId}
+                      onClick={() => setEditingTaskId(task.id)}
                     >
-                      Start Timer
+                      Edit
                     </ActionButton>
-                  )
-                )}
-              </div>
-              
-              <TaskActions>
-                <DeleteButton 
-                  onClick={() => deleteTask(task.id)}
-                >
-                  Delete
-                </DeleteButton>
-              </TaskActions>
-            </TaskItem>
+                    <DeleteButton 
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      Delete
+                    </DeleteButton>
+                  </TaskActions>
+                </TaskItem>
+              )}
+            </React.Fragment>
           ))
         )}
       </TaskList>

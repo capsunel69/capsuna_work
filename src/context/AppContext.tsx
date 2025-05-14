@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Task, Meeting, Reminder, TimerSession } from '../types';
+import { TasksAPI, MeetingsAPI, RemindersAPI } from '../services/api';
 
 interface AppContextType {
   // Tasks
@@ -29,11 +30,15 @@ interface AppContextType {
   stopTimer: (taskId: string) => void;
   activeTaskId: string | null;
   currentTimer: number; // Current timer in seconds
+
+  // Loading states
+  isLoading: boolean;
+  error: string | null;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Get data from localStorage
+// Get data from localStorage (fallback if API fails)
 const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
   try {
     const item = localStorage.getItem(key);
@@ -55,32 +60,63 @@ const saveToLocalStorage = <T,>(key: string, value: T): void => {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // State for tasks, meetings, reminders
-  const [tasks, setTasks] = useState<Task[]>(() => 
-    loadFromLocalStorage('tasks', [])
-  );
-  const [meetings, setMeetings] = useState<Meeting[]>(() => 
-    loadFromLocalStorage('meetings', [])
-  );
-  const [reminders, setReminders] = useState<Reminder[]>(() => 
-    loadFromLocalStorage('reminders', [])
-  );
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]); 
+  
+  // Loading and error states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Timer state
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [currentTimer, setCurrentTimer] = useState<number>(0);
   const timerIntervalRef = useRef<number | null>(null);
 
-  // Save to localStorage when state changes
+  // Load data from API on mount
   useEffect(() => {
-    saveToLocalStorage('tasks', tasks);
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch tasks, meetings, and reminders in parallel
+        const [tasksData, meetingsData, remindersData] = await Promise.all([
+          TasksAPI.getAll(),
+          MeetingsAPI.getAll(),
+          RemindersAPI.getAll()
+        ]);
+        
+        setTasks(tasksData);
+        setMeetings(meetingsData);
+        setReminders(remindersData);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Using local data instead.');
+        
+        // Fall back to localStorage if API fails
+        setTasks(loadFromLocalStorage('tasks', []));
+        setMeetings(loadFromLocalStorage('meetings', []));
+        setReminders(loadFromLocalStorage('reminders', []));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
+  // Save to localStorage as backup
+  useEffect(() => {
+    if (tasks.length > 0) saveToLocalStorage('tasks', tasks);
   }, [tasks]);
 
   useEffect(() => {
-    saveToLocalStorage('meetings', meetings);
+    if (meetings.length > 0) saveToLocalStorage('meetings', meetings);
   }, [meetings]);
 
   useEffect(() => {
-    saveToLocalStorage('reminders', reminders);
+    if (reminders.length > 0) saveToLocalStorage('reminders', reminders);
   }, [reminders]);
   
   // Clean up timer interval when component unmounts
@@ -93,183 +129,269 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Task functions
-  const addTask = (task: Omit<Task, 'id' | 'createdAt' | 'timeSpent' | 'timers'>) => {
-    const newTask: Task = {
-      ...task,
-      id: uuidv4(),
-      createdAt: new Date(),
-      timeSpent: 0,
-      timers: []
-    };
-    setTasks([...tasks, newTask]);
-  };
+  const addTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt' | 'timeSpent' | 'timers'>) => {
+    try {
+      const newTask = await TasksAPI.create(task);
+      setTasks(prev => [...prev, newTask]);
+    } catch (err) {
+      console.error('Error adding task:', err);
+      setError('Failed to add task');
+      
+      // Add to local state even if API fails
+      const localTask: Task = {
+        ...task,
+        id: uuidv4(),
+        createdAt: new Date(),
+        timeSpent: 0,
+        timers: []
+      };
+      setTasks(prev => [...prev, localTask]);
+    }
+  }, []);
 
-  const updateTask = (taskId: string, updates: Partial<Task>) => {
-    setTasks(tasks.map(task => task.id === taskId ? { ...task, ...updates } : task));
-  };
+  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    try {
+      const updatedTask = await TasksAPI.update(taskId, updates);
+      setTasks(prev => prev.map(task => task.id === taskId ? updatedTask : task));
+    } catch (err) {
+      console.error('Error updating task:', err);
+      setError('Failed to update task');
+      
+      // Update local state even if API fails
+      setTasks(prev => prev.map(task => task.id === taskId ? { ...task, ...updates } : task));
+    }
+  }, []);
 
-  const deleteTask = (taskId: string) => {
-    setTasks(tasks.filter(task => task.id !== taskId));
-  };
+  const deleteTask = useCallback(async (taskId: string) => {
+    try {
+      await TasksAPI.delete(taskId);
+      setTasks(prev => prev.filter(task => task.id !== taskId));
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      setError('Failed to delete task');
+      
+      // Delete from local state even if API fails
+      setTasks(prev => prev.filter(task => task.id !== taskId));
+    }
+  }, []);
 
-  const toggleTaskCompletion = (taskId: string) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
-  };
+  const toggleTaskCompletion = useCallback(async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    try {
+      const updatedTask = await TasksAPI.update(taskId, { completed: !task.completed });
+      setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+    } catch (err) {
+      console.error('Error toggling task completion:', err);
+      setError('Failed to update task');
+      
+      // Update local state even if API fails
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
+    }
+  }, [tasks]);
 
   // Meeting functions
-  const addMeeting = (meeting: Omit<Meeting, 'id'>) => {
-    const newMeeting: Meeting = {
-      ...meeting,
-      id: uuidv4()
-    };
-    setMeetings([...meetings, newMeeting]);
-  };
+  const addMeeting = useCallback(async (meeting: Omit<Meeting, 'id'>) => {
+    try {
+      const newMeeting = await MeetingsAPI.create(meeting);
+      setMeetings(prev => [...prev, newMeeting]);
+    } catch (err) {
+      console.error('Error adding meeting:', err);
+      setError('Failed to add meeting');
+      
+      // Add to local state even if API fails
+      const localMeeting: Meeting = {
+        ...meeting,
+        id: uuidv4()
+      };
+      setMeetings(prev => [...prev, localMeeting]);
+    }
+  }, []);
 
-  const updateMeeting = (meetingId: string, updates: Partial<Meeting>) => {
-    setMeetings(meetings.map(meeting => 
-      meeting.id === meetingId ? { ...meeting, ...updates } : meeting
-    ));
-  };
+  const updateMeeting = useCallback(async (meetingId: string, updates: Partial<Meeting>) => {
+    try {
+      const updatedMeeting = await MeetingsAPI.update(meetingId, updates);
+      setMeetings(prev => prev.map(meeting => meeting.id === meetingId ? updatedMeeting : meeting));
+    } catch (err) {
+      console.error('Error updating meeting:', err);
+      setError('Failed to update meeting');
+      
+      // Update local state even if API fails
+      setMeetings(prev => prev.map(meeting => meeting.id === meetingId ? { ...meeting, ...updates } : meeting));
+    }
+  }, []);
 
-  const deleteMeeting = (meetingId: string) => {
-    setMeetings(meetings.filter(meeting => meeting.id !== meetingId));
-  };
+  const deleteMeeting = useCallback(async (meetingId: string) => {
+    try {
+      await MeetingsAPI.delete(meetingId);
+      setMeetings(prev => prev.filter(meeting => meeting.id !== meetingId));
+    } catch (err) {
+      console.error('Error deleting meeting:', err);
+      setError('Failed to delete meeting');
+      
+      // Delete from local state even if API fails
+      setMeetings(prev => prev.filter(meeting => meeting.id !== meetingId));
+    }
+  }, []);
 
-  const toggleMeetingCompletion = (meetingId: string) => {
-    setMeetings(meetings.map(meeting => 
-      meeting.id === meetingId ? { ...meeting, completed: !meeting.completed } : meeting
-    ));
-  };
+  const toggleMeetingCompletion = useCallback(async (meetingId: string) => {
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+    
+    try {
+      const updatedMeeting = await MeetingsAPI.update(meetingId, { completed: !meeting.completed });
+      setMeetings(prev => prev.map(m => m.id === meetingId ? updatedMeeting : m));
+    } catch (err) {
+      console.error('Error toggling meeting completion:', err);
+      setError('Failed to update meeting');
+      
+      // Update local state even if API fails
+      setMeetings(prev => prev.map(m => m.id === meetingId ? { ...m, completed: !m.completed } : m));
+    }
+  }, [meetings]);
 
   // Reminder functions
-  const addReminder = (reminder: Omit<Reminder, 'id'>) => {
-    const newReminder: Reminder = {
-      ...reminder,
-      id: uuidv4()
-    };
-    setReminders([...reminders, newReminder]);
-  };
+  const addReminder = useCallback(async (reminder: Omit<Reminder, 'id'>) => {
+    try {
+      const newReminder = await RemindersAPI.create(reminder);
+      setReminders(prev => [...prev, newReminder]);
+    } catch (err) {
+      console.error('Error adding reminder:', err);
+      setError('Failed to add reminder');
+      
+      // Add to local state even if API fails
+      const localReminder: Reminder = {
+        ...reminder,
+        id: uuidv4()
+      };
+      setReminders(prev => [...prev, localReminder]);
+    }
+  }, []);
 
-  const updateReminder = (reminderId: string, updates: Partial<Reminder>) => {
-    setReminders(reminders.map(reminder => 
-      reminder.id === reminderId ? { ...reminder, ...updates } : reminder
-    ));
-  };
+  const updateReminder = useCallback(async (reminderId: string, updates: Partial<Reminder>) => {
+    try {
+      const updatedReminder = await RemindersAPI.update(reminderId, updates);
+      setReminders(prev => prev.map(reminder => reminder.id === reminderId ? updatedReminder : reminder));
+    } catch (err) {
+      console.error('Error updating reminder:', err);
+      setError('Failed to update reminder');
+      
+      // Update local state even if API fails
+      setReminders(prev => prev.map(reminder => reminder.id === reminderId ? { ...reminder, ...updates } : reminder));
+    }
+  }, []);
 
-  const deleteReminder = (reminderId: string) => {
-    setReminders(reminders.filter(reminder => reminder.id !== reminderId));
-  };
+  const deleteReminder = useCallback(async (reminderId: string) => {
+    try {
+      await RemindersAPI.delete(reminderId);
+      setReminders(prev => prev.filter(reminder => reminder.id !== reminderId));
+    } catch (err) {
+      console.error('Error deleting reminder:', err);
+      setError('Failed to delete reminder');
+      
+      // Delete from local state even if API fails
+      setReminders(prev => prev.filter(reminder => reminder.id !== reminderId));
+    }
+  }, []);
 
-  const toggleReminderCompletion = (reminderId: string) => {
-    setReminders(reminders.map(reminder => 
-      reminder.id === reminderId ? { ...reminder, completed: !reminder.completed } : reminder
-    ));
-  };
+  const toggleReminderCompletion = useCallback(async (reminderId: string) => {
+    const reminder = reminders.find(r => r.id === reminderId);
+    if (!reminder) return;
+    
+    try {
+      const updatedReminder = await RemindersAPI.update(reminderId, { completed: !reminder.completed });
+      setReminders(prev => prev.map(r => r.id === reminderId ? updatedReminder : r));
+    } catch (err) {
+      console.error('Error toggling reminder completion:', err);
+      setError('Failed to update reminder');
+      
+      // Update local state even if API fails
+      setReminders(prev => prev.map(r => r.id === reminderId ? { ...r, completed: !r.completed } : r));
+    }
+  }, [reminders]);
 
   // Timer functions
-  const startTimer = (taskId: string) => {
-    // Stop any existing timer
+  const startTimer = useCallback((taskId: string) => {
+    setActiveTaskId(taskId);
+    setCurrentTimer(0);
+    
+    // Start the timer
+    if (timerIntervalRef.current !== null) {
+      window.clearInterval(timerIntervalRef.current);
+    }
+    
+    const startTime = Date.now();
+    const timerId = window.setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+      setCurrentTimer(elapsedSeconds);
+    }, 1000);
+    
+    timerIntervalRef.current = timerId;
+  }, []);
+
+  const stopTimer = useCallback(async (taskId: string) => {
     if (timerIntervalRef.current !== null) {
       window.clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-
-    // Create new timer session
-    const now = new Date();
-    const task = tasks.find(t => t.id === taskId);
     
-    if (task) {
-      const newTimerSession: TimerSession = {
-        id: uuidv4(),
-        startTime: now,
-        duration: 0
-      };
-      
-      // Update task with new timer session
-      const updatedTask = {
-        ...task,
-        timers: [...task.timers, newTimerSession]
-      };
-      
-      updateTask(taskId, updatedTask);
-      
-      // Start timer interval
-      const intervalId = window.setInterval(() => {
-        setCurrentTimer(prev => prev + 1);
-      }, 1000);
-      
-      timerIntervalRef.current = intervalId;
-      setActiveTaskId(taskId);
-      setCurrentTimer(0);
-      
-      console.log('Timer started for task: ' + task.title);
-    }
-  };
-
-  const stopTimer = (taskId: string) => {
-    if (timerIntervalRef.current !== null) {
-      window.clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-
     const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
     
-    if (task && task.timers.length > 0) {
-      const lastTimerIndex = task.timers.length - 1;
-      const updatedTimers = [...task.timers];
-      
-      // Update the last timer session with end time
-      updatedTimers[lastTimerIndex] = {
-        ...updatedTimers[lastTimerIndex],
-        endTime: new Date(),
-        duration: currentTimer
-      };
-      
-      // Update task with completed timer and increment total time spent
-      const updatedTask = {
-        ...task,
+    const timerSession: TimerSession = {
+      id: uuidv4(),
+      startTime: new Date(Date.now() - currentTimer * 1000),
+      endTime: new Date(),
+      duration: currentTimer
+    };
+    
+    const updatedTimers = [...task.timers, timerSession];
+    const updatedTimeSpent = task.timeSpent + currentTimer;
+    
+    try {
+      await updateTask(taskId, {
         timers: updatedTimers,
-        timeSpent: task.timeSpent + currentTimer
-      };
-      
-      updateTask(taskId, updatedTask);
-      setActiveTaskId(null);
-      setCurrentTimer(0);
-      
-      console.log('Timer stopped for task: ' + task.title);
+        timeSpent: updatedTimeSpent
+      });
+    } catch (err) {
+      console.error('Error saving timer session:', err);
     }
-  };
-
-  // Create context value object
-  const contextValue: AppContextType = {
-    tasks,
-    addTask,
-    updateTask,
-    deleteTask,
-    toggleTaskCompletion,
     
-    meetings,
-    addMeeting,
-    updateMeeting,
-    deleteMeeting,
-    toggleMeetingCompletion,
-    
-    reminders,
-    addReminder,
-    updateReminder,
-    deleteReminder,
-    toggleReminderCompletion,
-    
-    startTimer,
-    stopTimer,
-    activeTaskId,
-    currentTimer
-  };
+    setActiveTaskId(null);
+    setCurrentTimer(0);
+  }, [currentTimer, tasks, updateTask]);
 
   return (
-    <AppContext.Provider value={contextValue}>
+    <AppContext.Provider
+      value={{
+        tasks,
+        addTask,
+        updateTask,
+        deleteTask,
+        toggleTaskCompletion,
+        
+        meetings,
+        addMeeting,
+        updateMeeting,
+        deleteMeeting,
+        toggleMeetingCompletion,
+        
+        reminders,
+        addReminder,
+        updateReminder,
+        deleteReminder,
+        toggleReminderCompletion,
+        
+        startTimer,
+        stopTimer,
+        activeTaskId,
+        currentTimer,
+        
+        isLoading,
+        error
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

@@ -1,56 +1,54 @@
-# Retro Task Manager
+# Windows XP Task Manager
 
-A Windows 98-style task and personal management application. This app allows you to manage tasks, meetings, and reminders, with a built-in timer to track how much time you spend on each task.
+A retro-styled task management application with Windows XP aesthetics, featuring task tracking, meetings, reminders, and time tracking capabilities.
 
 ## Features
 
-- **Task Management**: Create, edit, and delete tasks with priorities and due dates
-- **Meeting Management**: Schedule and manage meetings with participants
-- **Reminders**: Set one-time or recurring reminders
-- **Time Tracking**: Track time spent on tasks with a built-in timer
-- **Retro UI**: Experience a nostalgic Windows 98-style interface
+- Windows XP themed UI with classic Bliss wallpaper and interface elements
+- Task management with timer tracking
+- Meeting scheduling with participant support
+- Reminders with complex recurring patterns (daily, weekly, monthly)
+- MongoDB backend with Netlify Functions
 
 ## Tech Stack
 
-- React + TypeScript
-- Vite
-- React Router
-- 98.css for Windows 98-style UI
-- styled-components
-- date-fns for date formatting
-- UUID for generating unique IDs
+- Frontend: React.js with styled-components
+- Backend: Netlify Functions (serverless)
+- Database: MongoDB
+- Deployment: Netlify
 
-## Installation
+## Local Development
 
 1. Clone the repository
-2. Navigate to the project directory
-3. Install dependencies:
-
-```bash
-npm install
-```
-
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Create a `.env` file in the root directory (see `env.example` for required variables)
 4. Start the development server:
+   ```
+   npm run dev
+   ```
 
-```bash
-npm run dev
-```
+## Backend Development
 
-## Usage
+The application uses Netlify Functions for the backend API. These are serverless functions that run on-demand.
 
-Navigate between different sections using the navigation buttons at the top:
+- All database models are in `netlify/functions/models/`
+- API endpoints are in `netlify/functions/`
+- Database connection is managed in `netlify/functions/utils/db.js`
 
-- **Dashboard**: Overview of your tasks, meetings, and reminders
-- **Tasks**: Manage tasks and track time
-- **Meetings**: Schedule and manage meetings
-- **Reminders**: Set up and manage reminders
+## Deploying to Netlify
 
-### Task Timer
-
-1. Create a task in the Tasks section
-2. Click "Start Timer" to begin tracking time
-3. When finished, click "Stop Timer"
-4. The timer will automatically add the time to the task's total time spent
+1. Push your code to GitHub
+2. Connect your repository to Netlify
+3. Configure the following environment variables in Netlify:
+   - `REACT_APP_MONGODB_URI`: Your MongoDB connection URI
+   - `NODE_ENV`: Set to `production` for production deployment
+4. Deploy with the following settings:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+   - Functions directory: `netlify/functions`
 
 ## License
 

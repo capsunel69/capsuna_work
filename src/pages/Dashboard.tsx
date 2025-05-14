@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import styled from 'styled-components';
+import { OverdueTag } from '../components/shared/TagStyles';
+import LoadingState from '../components/shared/LoadingState';
+import ErrorMessage from '../components/shared/ErrorMessage';
 
 const PageTitle = styled.h2`
   font-size: 1.8rem;
@@ -78,7 +81,23 @@ const ViewAllLink = styled(Link)`
 `;
 
 const Dashboard: React.FC = () => {
-  const { tasks, meetings, reminders, currentTimer, activeTaskId } = useAppContext();
+  const { 
+    tasks, 
+    meetings, 
+    reminders, 
+    currentTimer, 
+    activeTaskId,
+    isLoading,
+    error
+  } = useAppContext();
+  
+  if (isLoading) {
+    return <LoadingState message="Loading your dashboard..." />;
+  }
+  
+  if (error) {
+    return <ErrorMessage message={error} />;
+  }
   
   // Get incomplete tasks, upcoming meetings, and active reminders
   const incompleteTasks = tasks.filter(task => !task.completed).slice(0, 5);
@@ -87,6 +106,13 @@ const Dashboard: React.FC = () => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
   const activeReminders = reminders.filter(reminder => !reminder.completed).slice(0, 5);
+  
+  // Identify overdue tasks
+  const overdueTasks = tasks.filter(task => 
+    !task.completed && 
+    task.dueDate && 
+    isPast(new Date(task.dueDate))
+  ).slice(0, 5);
   
   // Format timer for display
   const formatTime = (seconds: number): string => {
@@ -99,58 +125,68 @@ const Dashboard: React.FC = () => {
   
   // Get active task
   const activeTask = tasks.find(task => task.id === activeTaskId);
-
+  
   return (
     <div>
       <PageTitle>Dashboard</PageTitle>
       
-      {activeTaskId && activeTask && (
-        <DashboardCard>
-          <DashboardTitle>Active Timer</DashboardTitle>
-          <CardContent>
-            <div><strong>Task:</strong> {activeTask.title}</div>
-            <div><strong>Time:</strong> {formatTime(currentTimer)}</div>
-          </CardContent>
-        </DashboardCard>
-      )}
-      
       <DashboardContainer>
         <DashboardCard>
           <DashboardTitle>
-            Incomplete Tasks
+            Tasks To Do
             <ViewAllLink to="/tasks">View All</ViewAllLink>
           </DashboardTitle>
-          {incompleteTasks.length > 0 ? (
+          <DashboardList>
+            {incompleteTasks.length > 0 ? (
+              incompleteTasks.map(task => (
+                <ListItem key={task.id}>
+                  <span>
+                    {task.title}
+                    {task.dueDate && isPast(new Date(task.dueDate)) && <OverdueTag>OVERDUE</OverdueTag>}
+                  </span>
+                  <span>{task.priority}</span>
+                </ListItem>
+              ))
+            ) : (
+              <NoItems>No pending tasks</NoItems>
+            )}
+          </DashboardList>
+        </DashboardCard>
+        
+        {overdueTasks.length > 0 && (
+          <DashboardCard>
+            <DashboardTitle style={{ background: 'linear-gradient(90deg, #8B0000, #FF6347)' }}>
+              Overdue Tasks
+              <ViewAllLink to="/tasks">View All</ViewAllLink>
+            </DashboardTitle>
             <DashboardList>
-              {incompleteTasks.map(task => (
+              {overdueTasks.map(task => (
                 <ListItem key={task.id}>
                   <span>{task.title}</span>
-                  <span>{task.priority}</span>
+                  <span>Due: {format(new Date(task.dueDate!), 'MMM d, h:mm a')}</span>
                 </ListItem>
               ))}
             </DashboardList>
-          ) : (
-            <NoItems>No incomplete tasks</NoItems>
-          )}
-        </DashboardCard>
+          </DashboardCard>
+        )}
         
         <DashboardCard>
           <DashboardTitle>
             Upcoming Meetings
             <ViewAllLink to="/meetings">View All</ViewAllLink>
           </DashboardTitle>
-          {upcomingMeetings.length > 0 ? (
-            <DashboardList>
-              {upcomingMeetings.map(meeting => (
+          <DashboardList>
+            {upcomingMeetings.length > 0 ? (
+              upcomingMeetings.map(meeting => (
                 <ListItem key={meeting.id}>
                   <span>{meeting.title}</span>
                   <span>{format(new Date(meeting.date), 'MMM d, h:mm a')}</span>
                 </ListItem>
-              ))}
-            </DashboardList>
-          ) : (
-            <NoItems>No upcoming meetings</NoItems>
-          )}
+              ))
+            ) : (
+              <NoItems>No upcoming meetings</NoItems>
+            )}
+          </DashboardList>
         </DashboardCard>
         
         <DashboardCard>
@@ -158,27 +194,33 @@ const Dashboard: React.FC = () => {
             Active Reminders
             <ViewAllLink to="/reminders">View All</ViewAllLink>
           </DashboardTitle>
-          {activeReminders.length > 0 ? (
-            <DashboardList>
-              {activeReminders.map(reminder => (
+          <DashboardList>
+            {activeReminders.length > 0 ? (
+              activeReminders.map(reminder => (
                 <ListItem key={reminder.id}>
                   <span>{reminder.title}</span>
-                  <span>{format(new Date(reminder.date), 'MMM d, h:mm a')}</span>
+                  <span>{reminder.recurring ? `${reminder.recurring}` : format(new Date(reminder.date), 'MMM d')}</span>
                 </ListItem>
-              ))}
-            </DashboardList>
-          ) : (
-            <NoItems>No active reminders</NoItems>
-          )}
+              ))
+            ) : (
+              <NoItems>No active reminders</NoItems>
+            )}
+          </DashboardList>
         </DashboardCard>
         
         <DashboardCard>
-          <DashboardTitle>Statistics</DashboardTitle>
+          <DashboardTitle>
+            Current Activity
+          </DashboardTitle>
           <CardContent>
-            <div>Total Tasks: {tasks.length}</div>
-            <div>Completed Tasks: {tasks.filter(task => task.completed).length}</div>
-            <div>Upcoming Meetings: {upcomingMeetings.length}</div>
-            <div>Active Reminders: {activeReminders.length}</div>
+            {activeTaskId ? (
+              <div>
+                <p><strong>Working on:</strong> {activeTask?.title}</p>
+                <p><strong>Time elapsed:</strong> {formatTime(currentTimer)}</p>
+              </div>
+            ) : (
+              <NoItems>No active timer</NoItems>
+            )}
           </CardContent>
         </DashboardCard>
       </DashboardContainer>

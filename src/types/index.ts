@@ -28,6 +28,13 @@ export interface Reminder {
   date: Date;
   completed: boolean;
   recurring?: 'daily' | 'weekly' | 'monthly';
+  recurringConfig?: {
+    type: string;
+    subtype?: 'dayOfMonth' | 'relativeDay';
+    dayOfWeek?: number;
+    dayOfMonth?: number;
+    weekNum?: number;
+  };
 }
 
 export interface TimerSession {
