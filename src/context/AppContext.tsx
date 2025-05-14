@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { isSameDay } from 'date-fns';
 import type { Task, Meeting, Reminder, TimerSession, Journal } from '../types';
 import { TasksAPI, MeetingsAPI, RemindersAPI, JournalsAPI } from '../services/api';
 
@@ -39,9 +40,16 @@ interface AppContextType {
   activeTaskId: string | null;
   currentTimer: number; // Current timer in seconds
 
+  // Current Date
+  currentDate: Date;
+  setCurrentDate: (date: Date) => void;
+
   // Loading states
   isLoading: boolean;
   error: string | null;
+
+  // New properties
+  canConvertReminderToTask: (reminder: Reminder) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -82,6 +90,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentTimer, setCurrentTimer] = useState<number>(0);
   const timerIntervalRef = useRef<number | null>(null);
 
+  // Current date state
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
   // Load data from API on mount
   useEffect(() => {
     const fetchData = async () => {
@@ -97,9 +108,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           JournalsAPI.getAll()
         ]);
         
+        // Clean up any stale reminder conversion states by checking against actual tasks
+        const cleanedReminders = remindersData.map(reminder => {
+          if (reminder.recurring) {
+            // For recurring reminders, only keep convertedToTaskDates that have corresponding tasks
+            const validDates = (reminder.convertedToTaskDates || []).filter(date => {
+              const convertedDate = new Date(date);
+              convertedDate.setHours(0, 0, 0, 0);
+              // Check if there's a task for this reminder on this date
+              return tasksData.some(task => 
+                task.convertedFromReminder === reminder.id && 
+                isSameDay(new Date(task.createdAt), convertedDate)
+              );
+            });
+            
+            return {
+              ...reminder,
+              convertedToTaskDates: validDates
+            };
+          } else {
+            // For non-recurring reminders, check if the task still exists
+            const hasAssociatedTask = tasksData.some(task => 
+              task.convertedFromReminder === reminder.id
+            );
+            
+            return {
+              ...reminder,
+              convertedToTask: hasAssociatedTask
+            };
+          }
+        });
+
+        // Update the cleaned reminders in the database
+        await Promise.all(cleanedReminders.map(reminder => 
+          RemindersAPI.update(reminder.id, 
+            reminder.recurring 
+              ? { convertedToTaskDates: reminder.convertedToTaskDates }
+              : { convertedToTask: reminder.convertedToTask }
+          )
+        ));
+        
         setTasks(tasksData);
         setMeetings(meetingsData);
-        setReminders(remindersData);
+        setReminders(cleanedReminders); // Use the cleaned reminders
         setJournals(journalsData);
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -192,13 +243,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await TasksAPI.delete(taskId);
       setTasks(prev => prev.filter(task => task.id !== taskId));
       
-      // If this task was linked to a reminder, reset the reminder
+      // If this task was linked to a reminder, reset the reminder's conversion status
       if (reminderToReset) {
-        const updatedReminder = await RemindersAPI.update(reminderToReset.id, {
-          convertedToTask: false,
-          completed: false, // Also reset completed status
-        });
+        const today = new Date(currentDate);
+        today.setHours(0, 0, 0, 0);
         
+        const updates: Partial<Reminder> = reminderToReset.recurring
+          ? {
+              // For recurring reminders, remove today's date from convertedToTaskDates
+              convertedToTaskDates: (reminderToReset.convertedToTaskDates || []).filter(date => {
+                const convertedDate = new Date(date);
+                convertedDate.setHours(0, 0, 0, 0);
+                return convertedDate.getTime() !== today.getTime();
+              })
+            }
+          : { 
+              // For non-recurring reminders, reset convertedToTask flag
+              convertedToTask: false 
+            };
+        
+        // Also reset completion status if the task was completed
+        if (task.completed) {
+          if (reminderToReset.recurring) {
+            updates.completedInstances = (reminderToReset.completedInstances || []).filter(date => {
+              const completedDate = new Date(date);
+              completedDate.setHours(0, 0, 0, 0);
+              return completedDate.getTime() !== today.getTime();
+            });
+          } else {
+            updates.completed = false;
+          }
+        }
+        
+        const updatedReminder = await RemindersAPI.update(reminderToReset.id, updates);
         setReminders(prev => prev.map(r => 
           r.id === reminderToReset.id ? updatedReminder : r
         ));
@@ -212,12 +289,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Also try to reset the reminder locally if API fails
       if (reminderToReset) {
+        const today = new Date(currentDate);
+        today.setHours(0, 0, 0, 0);
+        
         setReminders(prev => prev.map(r => 
-          r.id === reminderToReset.id ? { ...r, convertedToTask: false, completed: false } : r
+          r.id === reminderToReset.id 
+            ? { 
+                ...r, 
+                ...(r.recurring 
+                  ? {
+                      convertedToTaskDates: (r.convertedToTaskDates || []).filter(date => {
+                        const convertedDate = new Date(date);
+                        convertedDate.setHours(0, 0, 0, 0);
+                        return convertedDate.getTime() !== today.getTime();
+                      }),
+                      completedInstances: task.completed 
+                        ? (r.completedInstances || []).filter(date => {
+                            const completedDate = new Date(date);
+                            completedDate.setHours(0, 0, 0, 0);
+                            return completedDate.getTime() !== today.getTime();
+                          })
+                        : r.completedInstances
+                    }
+                  : { 
+                      convertedToTask: false,
+                      completed: task.completed ? false : r.completed
+                    }
+                )
+              } 
+            : r
         ));
       }
     }
-  }, [tasks, reminders]);
+  }, [tasks, reminders, currentDate]);
 
   const toggleTaskCompletion = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -537,10 +641,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const createdTask = await TasksAPI.create(newTask);
       setTasks(prev => [...prev, createdTask]);
       
+      // For recurring reminders, store the conversion date instead of a boolean
+      const today = new Date(currentDate);
+      today.setHours(0, 0, 0, 0);
+      
+      const updates: Partial<Reminder> = reminder.recurring
+        ? {
+            convertedToTaskDates: [...(reminder.convertedToTaskDates || []), today.toISOString()]
+          }
+        : { convertedToTask: true };
+      
       // Update the reminder to mark it as converted
-      const updatedReminder = await RemindersAPI.update(reminderId, { 
-        convertedToTask: true 
-      });
+      const updatedReminder = await RemindersAPI.update(reminderId, updates);
       
       setReminders(prev => prev.map(r => 
         r.id === reminderId ? updatedReminder : r
@@ -564,12 +676,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         convertedFromReminder: reminder.id
       };
       
+      const today = new Date(currentDate);
+      today.setHours(0, 0, 0, 0);
+      
       setTasks(prev => [...prev, newTask]);
       setReminders(prev => prev.map(r => 
-        r.id === reminderId ? { ...r, convertedToTask: true } : r
+        r.id === reminderId 
+          ? { 
+              ...r, 
+              ...(r.recurring 
+                ? { convertedToTaskDates: [...(r.convertedToTaskDates || []), today.toISOString()] }
+                : { convertedToTask: true }
+              )
+            } 
+          : r
       ));
     }
-  }, [reminders]);
+  }, [reminders, currentDate]);
+
+  // Helper function to check if a reminder can be converted to task
+  const canConvertReminderToTask = useCallback((reminder: Reminder): boolean => {
+    // Get today's date with time set to midnight
+    const today = new Date(currentDate);
+    today.setHours(0, 0, 0, 0);
+    
+    // For non-recurring reminders, also check if the date is today
+    if (!reminder.recurring) {
+      const reminderDate = new Date(reminder.date);
+      reminderDate.setHours(0, 0, 0, 0);
+      
+      // If the reminder is not for today, we can't convert it
+      if (reminderDate.getTime() !== today.getTime()) {
+        return false;
+      }
+      
+      // If it's already been converted, we can't convert it again
+      if (reminder.convertedToTask) {
+        return false;
+      }
+    }
+    
+    // Find any task that was created from this reminder today
+    const hasTaskForToday = tasks.some(task => {
+      // Check if the task was created from this reminder
+      if (task.convertedFromReminder !== reminder.id) {
+        return false;
+      }
+      
+      // Check if the task was created today
+      const taskDate = new Date(task.createdAt);
+      taskDate.setHours(0, 0, 0, 0);
+      return taskDate.getTime() === today.getTime();
+    });
+    
+    // Can convert if there's no task for today
+    return !hasTaskForToday;
+  }, [currentDate, tasks]);
 
   // Journal functions
   const addJournal = useCallback(async (journal: Omit<Journal, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -702,8 +864,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeTaskId,
         currentTimer,
         
+        currentDate,
+        setCurrentDate,
+        
         isLoading,
-        error
+        error,
+        
+        canConvertReminderToTask
       }}
     >
       {children}

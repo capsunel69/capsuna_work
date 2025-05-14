@@ -63,6 +63,10 @@ const ReminderSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  convertedToTaskDates: {
+    type: [String],
+    default: []
+  },
   completedInstances: {
     type: [Date],
     default: []

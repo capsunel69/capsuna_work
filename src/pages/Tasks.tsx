@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
 import { format, isPast } from 'date-fns';
+import LinkifyText from '../components/shared/LinkifyText';
 import {
   FormContainer,
   FormRow,
@@ -344,7 +345,11 @@ const Tasks: React.FC = () => {
                       {isOverdue(task) && <OverdueTag>OVERDUE</OverdueTag>}
                       {task.convertedFromReminder && <ConvertedTag>FROM REMINDER</ConvertedTag>}
                     </TaskTitle>
-                    {task.description && <div>{task.description}</div>}
+                    {task.description && (
+                      <div>
+                        <LinkifyText text={task.description} />
+                      </div>
+                    )}
                     <TaskInfo>
                       Priority: {task.priority}
                       {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
@@ -423,7 +428,11 @@ const Tasks: React.FC = () => {
                   {task.title}
                   {task.convertedFromReminder && <ConvertedTag>FROM REMINDER</ConvertedTag>}
                 </TaskTitle>
-                {task.description && <div>{task.description}</div>}
+                {task.description && (
+                  <div>
+                    <LinkifyText text={task.description} />
+                  </div>
+                )}
                 <TaskInfo>
                   Priority: {task.priority}
                   {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}

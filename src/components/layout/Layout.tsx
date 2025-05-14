@@ -7,6 +7,7 @@ import '@react95/icons/icons.css';
 import { Computer3, BatWait, Awschd32402, Confcp118, Mspaint, Shell3213 } from '@react95/icons';
 import blissBackground from '../../assets/bliss-update.jpg';
 import { useAuth } from '../../context/AuthContext';
+import { useAppContext } from '../../context/AppContext';
 
 const AppContainer = styled.div`
   height: 100vh;
@@ -23,10 +24,10 @@ const AppContainer = styled.div`
 `;
 
 const Window = styled.div`
-  width: 85%;
-  height: 85%;
+  width: 100%;
+  height: 100%;
   max-width: 1200px;
-  max-height: 900px;
+  max-height: 1000px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
@@ -68,6 +69,25 @@ const StatusDateTime = styled.div`
 const StatusDate = styled.div`
   border-right: 1px solid #ccc;
   padding-right: 16px;
+  cursor: pointer;
+  position: relative;
+`;
+
+const DatePicker = styled.input`
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  padding: 4px;
+  border: 1px solid #999;
+  background: white;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+  font-size: 0.9rem;
+  display: none;
+  
+  &.visible {
+    display: block;
+  }
 `;
 
 const StatusTime = styled.div`
@@ -123,21 +143,35 @@ const LogoutButton = styled.button`
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const { logout } = useAuth();
+  const { currentDate, setCurrentDate } = useAppContext();
   
-  // Update current time every minute
+  // Update current time every minute if not in test mode
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 60000); // Update every minute
-    
-    return () => clearInterval(timer);
-  }, []);
+    if (!showDatePicker) {
+      const timer = setInterval(() => {
+        setCurrentDate(new Date());
+      }, 60000); // Update every minute
+      
+      return () => clearInterval(timer);
+    }
+  }, [showDatePicker, setCurrentDate]);
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to log out?')) {
       logout();
+    }
+  };
+
+  const handleDateDoubleClick = () => {
+    setShowDatePicker(!showDatePicker);
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = new Date(e.target.value);
+    if (!isNaN(newDate.getTime())) {
+      setCurrentDate(newDate);
     }
   };
 
@@ -205,8 +239,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <StatusBar>
           <div>Ready</div>
           <StatusDateTime>
-            <StatusDate>{format(currentDateTime, 'EEE, MMM d, yyyy')}</StatusDate>
-            <StatusTime>{format(currentDateTime, 'h:mm a')}</StatusTime>
+            <StatusDate onDoubleClick={handleDateDoubleClick}>
+              {format(currentDate, 'EEE, MMM d, yyyy')}
+              <DatePicker
+                type="datetime-local"
+                className={showDatePicker ? 'visible' : ''}
+                value={format(currentDate, "yyyy-MM-dd'T'HH:mm")}
+                onChange={handleDateChange}
+              />
+            </StatusDate>
+            <StatusTime>{format(currentDate, 'h:mm a')}</StatusTime>
           </StatusDateTime>
         </StatusBar>
       </Window>

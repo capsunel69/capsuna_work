@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { format, isPast, isToday, isSameDay } from 'date-fns';
+import { format, isPast, isSameDay } from 'date-fns';
 import styled from 'styled-components';
 import { OverdueTag } from '../components/shared/TagStyles';
 import LoadingState from '../components/shared/LoadingState';
@@ -52,6 +52,7 @@ const ListItem = styled.li`
   padding: 8px 0;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   border-bottom: 1px solid #dfdfdf;
   &:last-child {
     border-bottom: none;
@@ -124,12 +125,34 @@ const CompletedCheckbox = styled.input.attrs({ type: 'checkbox' })`
   margin-right: 8px;
 `;
 
+const TaskContent = styled.div`
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+`;
+
+const TaskText = styled.span`
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 8px;
+`;
+
+const TaskDate = styled.span`
+  white-space: nowrap;
+  color: #666;
+  margin-left: auto;
+  padding-left: 8px;
+`;
+
 const Dashboard: React.FC = () => {
   const { 
     tasks, 
     meetings, 
     reminders, 
-    currentTimer, 
+    currentTimer,
+    currentDate,
     activeTaskId,
     isLoading,
     error,
@@ -149,34 +172,40 @@ const Dashboard: React.FC = () => {
   const incompleteTasks = tasks.filter(task => !task.completed).slice(0, 5);
   const completedTasks = tasks.filter(task => task.completed).slice(0, 5);
   const upcomingMeetings = meetings
-    .filter(meeting => new Date(meeting.date) > new Date() && !meeting.completed)
+    .filter(meeting => new Date(meeting.date) > new Date(currentDate) && !meeting.completed)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
   
   // Get today's reminders and other active reminders
   const todayReminders = reminders.filter(reminder => {
-    if (reminder.completed || reminder.convertedToTask) return false;
-    
-    // For non-recurring reminders, check if date is today
+    const today = new Date(currentDate);
+    today.setHours(0, 0, 0, 0);
+
+    // For non-recurring reminders
     if (!reminder.recurring) {
-      return isToday(new Date(reminder.date));
+      // Skip if completed or converted to task
+      if (reminder.completed || reminder.convertedToTask) return false;
+      
+      // Check if the reminder is for today
+      const reminderDate = new Date(reminder.date);
+      reminderDate.setHours(0, 0, 0, 0);
+      return reminderDate.getTime() === today.getTime();
     }
     
     // For recurring reminders
-    const now = new Date();
+    
+    // First check if this reminder should appear today based on its schedule
+    let shouldShowToday = false;
     
     if (reminder.recurring === 'daily') {
-      return true; // Daily reminders are due every day
-    }
-    
-    if (reminder.recurring === 'weekly' && reminder.recurringConfig) {
-      return now.getDay() === reminder.recurringConfig.dayOfWeek;
-    }
-    
-    if (reminder.recurring === 'monthly' && reminder.recurringConfig) {
+      shouldShowToday = true;
+    } else if (reminder.recurring === 'weekly' && reminder.recurringConfig) {
+      shouldShowToday = today.getDay() === reminder.recurringConfig.dayOfWeek;
+    } else if (reminder.recurring === 'monthly' && reminder.recurringConfig) {
       if (reminder.recurringConfig.subtype === 'dayOfMonth') {
-        return now.getDate() === reminder.recurringConfig.dayOfMonth;
-      } else if (reminder.recurringConfig.subtype === 'relativeDay') {
+        shouldShowToday = today.getDate() === reminder.recurringConfig.dayOfMonth;
+      } else {
+        // Handle relative day logic
         const weekNum = reminder.recurringConfig.weekNum!;
         const dayOfWeek = reminder.recurringConfig.dayOfWeek!;
         
@@ -185,31 +214,42 @@ const Dashboard: React.FC = () => {
         
         if (weekNum === -1) {
           // Last occurrence
-          const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           let day = lastDayOfMonth.getDate();
           
-          while (new Date(now.getFullYear(), now.getMonth(), day).getDay() !== dayOfWeek) {
+          while (new Date(today.getFullYear(), today.getMonth(), day).getDay() !== dayOfWeek) {
             day--;
           }
           
-          targetDate = new Date(now.getFullYear(), now.getMonth(), day);
+          targetDate = new Date(today.getFullYear(), today.getMonth(), day);
         } else {
           // Calculate first occurrence of the day in the month
-          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
           const firstDayOfWeek = firstDay.getDay();
           let dayOffset = dayOfWeek - firstDayOfWeek;
           if (dayOffset < 0) dayOffset += 7;
           
           // Calculate the date of the nth occurrence
           const day = 1 + dayOffset + (weekNum - 1) * 7;
-          targetDate = new Date(now.getFullYear(), now.getMonth(), day);
+          targetDate = new Date(today.getFullYear(), today.getMonth(), day);
         }
         
-        return isSameDay(now, targetDate);
+        shouldShowToday = isSameDay(today, targetDate);
       }
     }
     
-    return false;
+    // If it's not scheduled for today, don't show it
+    if (!shouldShowToday) return false;
+    
+    // Check if it was completed today specifically
+    const isCompletedToday = (reminder.completedInstances || []).some(date => {
+      const completedDate = new Date(date);
+      completedDate.setHours(0, 0, 0, 0);
+      return completedDate.getTime() === today.getTime();
+    });
+    
+    // Show the reminder if it's scheduled for today and hasn't been completed today
+    return !isCompletedToday;
   });
   
   // Other active reminders (not today and not converted to tasks)
@@ -222,7 +262,8 @@ const Dashboard: React.FC = () => {
   const overdueTasks = tasks.filter(task => 
     !task.completed && 
     task.dueDate && 
-    isPast(new Date(task.dueDate))
+    isPast(new Date(task.dueDate)) &&
+    new Date(task.dueDate) < new Date(currentDate)
   ).slice(0, 5);
   
   // Format timer for display
@@ -296,46 +337,51 @@ const Dashboard: React.FC = () => {
             </DashboardTitle>
             <DashboardList>
               {todayReminders.map(reminder => {
-                // Check if this reminder has been converted to a task
-                const convertedToTask = reminder.convertedToTask;
-                // Find the associated task if any
-                const associatedTask = tasks.find(t => t.convertedFromReminder === reminder.id);
+                // Check if this reminder has been converted to a task today
+                const isTaskCreatedToday = reminder.recurring
+                  ? (reminder.convertedToTaskDates || []).some(date => {
+                      const convertedDate = new Date(date);
+                      const today = new Date(currentDate);
+                      today.setHours(0, 0, 0, 0);
+                      convertedDate.setHours(0, 0, 0, 0);
+                      return convertedDate.getTime() === today.getTime();
+                    })
+                  : reminder.convertedToTask;
+
+                // Find the associated task if any, but only for today
+                const associatedTask = tasks.find(t => {
+                  if (t.convertedFromReminder !== reminder.id) return false;
+                  
+                  // Check if the task was created today
+                  const taskDate = new Date(t.createdAt);
+                  const today = new Date(currentDate);
+                  taskDate.setHours(0, 0, 0, 0);
+                  today.setHours(0, 0, 0, 0);
+                  return taskDate.getTime() === today.getTime();
+                });
                 
                 return (
                   <ReminderItem key={reminder.id}>
                     <span>
                       {reminder.title}
                       <TodayTag>TODAY</TodayTag>
-                      {associatedTask && (
+                      {(isTaskCreatedToday || associatedTask) && (
                         <span style={{ 
                           fontSize: '0.75rem', 
-                          backgroundColor: associatedTask.completed ? '#38a169' : '#805ad5', 
+                          backgroundColor: associatedTask?.completed ? '#38a169' : '#805ad5', 
                           color: 'white',
                           padding: '2px 6px',
                           borderRadius: '3px',
                           marginLeft: '8px'
                         }}>
-                          {associatedTask.completed ? 'COMPLETED' : 'TASK CREATED'}
+                          {associatedTask?.completed ? 'COMPLETED' : 'TASK CREATED'}
                         </span>
                       )}
                     </span>
-                    {!convertedToTask ? (
+                    {!isTaskCreatedToday && (
                       <ConvertButton onClick={() => handleConvertToTask(reminder.id)}>
                         Add as Task
                       </ConvertButton>
-                    ) : (
-                      associatedTask && (
-                        <ConvertButton 
-                          onClick={() => handleToggleTaskCompletion(associatedTask.id)}
-                          style={{ 
-                            background: associatedTask.completed ? 
-                              'linear-gradient(to bottom, #38a169, #2f855a)' : 
-                              'linear-gradient(to bottom, #4f94ea, #3a7bd5)'
-                          }}
-                        >
-                          {associatedTask.completed ? 'Mark Incomplete' : 'Mark Complete'}
-                        </ConvertButton>
-                      )
                     )}
                   </ReminderItem>
                 );
@@ -353,12 +399,12 @@ const Dashboard: React.FC = () => {
             <DashboardList>
               {completedTasks.map(task => (
                 <ListItem key={task.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <TaskContent>
                     <CompletedCheckbox
                       checked={task.completed}
                       onChange={() => handleToggleTaskCompletion(task.id)}
                     />
-                    <span style={{ textDecoration: 'line-through', color: '#888' }}>
+                    <TaskText style={{ textDecoration: 'line-through', color: '#888' }}>
                       {task.title}
                       {task.convertedFromReminder && <span style={{ 
                         fontSize: '0.75rem', 
@@ -368,9 +414,9 @@ const Dashboard: React.FC = () => {
                         borderRadius: '3px',
                         marginLeft: '8px'
                       }}>FROM REMINDER</span>}
-                    </span>
-                  </div>
-                  <span>{format(new Date(task.createdAt), 'MMM d')}</span>
+                    </TaskText>
+                    <TaskDate>{format(new Date(task.createdAt), 'MMM d')}</TaskDate>
+                  </TaskContent>
                 </ListItem>
               ))}
             </DashboardList>
