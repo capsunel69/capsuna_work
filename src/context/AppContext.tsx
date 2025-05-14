@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Task, Meeting, Reminder, TimerSession } from '../types';
 
@@ -68,7 +68,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Timer state
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [currentTimer, setCurrentTimer] = useState<number>(0);
-  const [timerInterval, setTimerInterval] = useState<number | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
 
   // Save to localStorage when state changes
   useEffect(() => {
@@ -82,6 +82,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     saveToLocalStorage('reminders', reminders);
   }, [reminders]);
+  
+  // Clean up timer interval when component unmounts
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current !== null) {
+        window.clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Task functions
   const addTask = (task: Omit<Task, 'id' | 'createdAt' | 'timeSpent' | 'timers'>) => {
@@ -162,8 +171,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Timer functions
   const startTimer = (taskId: string) => {
     // Stop any existing timer
-    if (timerInterval) {
-      clearInterval(timerInterval);
+    if (timerIntervalRef.current !== null) {
+      window.clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
 
     // Create new timer session
@@ -186,20 +196,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateTask(taskId, updatedTask);
       
       // Start timer interval
-      const interval = window.setInterval(() => {
+      const intervalId = window.setInterval(() => {
         setCurrentTimer(prev => prev + 1);
       }, 1000);
       
-      setTimerInterval(interval);
+      timerIntervalRef.current = intervalId;
       setActiveTaskId(taskId);
       setCurrentTimer(0);
+      
+      console.log('Timer started for task: ' + task.title);
     }
   };
 
   const stopTimer = (taskId: string) => {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      setTimerInterval(null);
+    if (timerIntervalRef.current !== null) {
+      window.clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
 
     const task = tasks.find(t => t.id === taskId);
@@ -225,6 +237,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateTask(taskId, updatedTask);
       setActiveTaskId(null);
       setCurrentTimer(0);
+      
+      console.log('Timer stopped for task: ' + task.title);
     }
   };
 

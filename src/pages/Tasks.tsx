@@ -2,6 +2,18 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
 import { format } from 'date-fns';
+import {
+  FormContainer,
+  FormRow,
+  FormRowHorizontal,
+  Label,
+  Input,
+  Select,
+  TextArea,
+  ButtonRow,
+  PrimaryButton,
+  SecondaryButton
+} from '../components/shared/FormStyles';
 
 const TasksContainer = styled.div`
   display: grid;
@@ -9,24 +21,19 @@ const TasksContainer = styled.div`
   gap: 16px;
 `;
 
-const TaskForm = styled.div`
-  border: 1px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888;
-  padding: 16px;
-  margin-bottom: 16px;
-`;
-
 const TaskList = styled.div`
   border: 1px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888;
+  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888, 0 3px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  background-color: #fff;
 `;
 
 const TaskItem = styled.div<{ completed: boolean }>`
-  padding: 8px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid #dfdfdf;
   display: grid;
   grid-template-columns: auto 1fr auto auto;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   ${({ completed }) => completed && 'text-decoration: line-through; color: #888;'}
   
@@ -44,25 +51,68 @@ const NoTasks = styled.div`
   padding: 32px;
   text-align: center;
   color: #888;
-`;
-
-const FormRow = styled.div`
-  margin-bottom: 8px;
-  display: flex;
-  flex-direction: column;
-`;
-
-const Label = styled.label`
-  margin-bottom: 4px;
+  font-size: 1.1rem;
 `;
 
 const TaskTitle = styled.div`
-  font-weight: ${({ theme }) => theme.bold};
+  font-weight: bold;
+  font-size: 1.1rem;
 `;
 
 const TaskInfo = styled.div`
-  font-size: 0.8em;
-  color: #888;
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 4px;
+`;
+
+const PageTitle = styled.h2`
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  font-weight: bold;
+  color: #333;
+`;
+
+const DeleteButton = styled.button`
+  background: linear-gradient(to bottom, #f96c6c, #e53e3e);
+  color: white;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #c53030;
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, #ff8080, #f05252);
+  }
+  
+  &:active {
+    background: #e53e3e;
+  }
+`;
+
+const ActionButton = styled.button`
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  background: linear-gradient(to bottom, #4f94ea, #3a7bd5);
+  color: white;
+  border-radius: 4px;
+  border: 1px solid #2c5ea9;
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, #5ca0ff, #4485e6);
+  }
+  
+  &:active {
+    background: #3a7bd5;
+  }
+  
+  &:disabled {
+    background: #cccccc;
+    border-color: #bbbbbb;
+    color: #888888;
+    cursor: not-allowed;
+  }
 `;
 
 const Tasks: React.FC = () => {
@@ -117,13 +167,13 @@ const Tasks: React.FC = () => {
   
   return (
     <div>
-      <h2>Tasks</h2>
+      <PageTitle>Tasks</PageTitle>
       
-      <TaskForm>
+      <FormContainer>
         <form onSubmit={handleSubmit}>
           <FormRow>
             <Label htmlFor="title">Title:</Label>
-            <input
+            <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -133,7 +183,7 @@ const Tasks: React.FC = () => {
           
           <FormRow>
             <Label htmlFor="description">Description:</Label>
-            <textarea
+            <TextArea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -141,35 +191,37 @@ const Tasks: React.FC = () => {
             />
           </FormRow>
           
-          <FormRow>
-            <Label htmlFor="priority">Priority:</Label>
-            <select
-              id="priority"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </FormRow>
+          <FormRowHorizontal>
+            <FormRow>
+              <Label htmlFor="priority">Priority:</Label>
+              <Select
+                id="priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </Select>
+            </FormRow>
+            
+            <FormRow>
+              <Label htmlFor="dueDate">Due Date (optional):</Label>
+              <Input
+                id="dueDate"
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </FormRow>
+          </FormRowHorizontal>
           
-          <FormRow>
-            <Label htmlFor="dueDate">Due Date (optional):</Label>
-            <input
-              id="dueDate"
-              type="datetime-local"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </FormRow>
-          
-          <div className="field-row">
-            <button type="submit">Add Task</button>
-            <button type="button" onClick={resetForm}>Reset</button>
-          </div>
+          <ButtonRow>
+            <PrimaryButton type="submit">Add Task</PrimaryButton>
+            <SecondaryButton type="button" onClick={resetForm}>Reset</SecondaryButton>
+          </ButtonRow>
         </form>
-      </TaskForm>
+      </FormContainer>
       
       <TaskList>
         {tasks.length === 0 ? (
@@ -195,26 +247,25 @@ const Tasks: React.FC = () => {
               
               <div>
                 {task.id === activeTaskId ? (
-                  <button onClick={() => stopTimer(task.id)}>Stop Timer</button>
+                  <ActionButton onClick={() => stopTimer(task.id)}>Stop Timer</ActionButton>
                 ) : (
                   !task.completed && (
-                    <button 
+                    <ActionButton 
                       onClick={() => startTimer(task.id)}
                       disabled={!!activeTaskId}
                     >
                       Start Timer
-                    </button>
+                    </ActionButton>
                   )
                 )}
               </div>
               
               <TaskActions>
-                <button 
+                <DeleteButton 
                   onClick={() => deleteTask(task.id)}
-                  className="error"
                 >
                   Delete
-                </button>
+                </DeleteButton>
               </TaskActions>
             </TaskItem>
           ))

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useAppContext } from '../../context/AppContext';
 
@@ -33,8 +33,27 @@ const ButtonContainer = styled.div`
   gap: 8px;
 `;
 
+const StopButton = styled.button`
+  background: linear-gradient(to bottom, #f96c6c, #e53e3e);
+  color: white;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #c53030;
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, #ff8080, #f05252);
+  }
+  
+  &:active {
+    background: #e53e3e;
+  }
+`;
+
 const Timer: React.FC = () => {
   const { tasks, activeTaskId, currentTimer, stopTimer } = useAppContext();
+  const [displayTime, setDisplayTime] = useState<string>("00:00:00");
   
   // Format time for display
   const formatTime = (seconds: number): string => {
@@ -44,6 +63,11 @@ const Timer: React.FC = () => {
     
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+  
+  // Update display time whenever currentTimer changes
+  useEffect(() => {
+    setDisplayTime(formatTime(currentTimer));
+  }, [currentTimer]);
   
   // Get active task
   const activeTask = tasks.find(task => task.id === activeTaskId);
@@ -56,7 +80,7 @@ const Timer: React.FC = () => {
   return (
     <TimerContainer>
       <TimerDisplay>
-        {formatTime(currentTimer)}
+        {displayTime}
       </TimerDisplay>
       
       <TaskInfo>
@@ -64,9 +88,9 @@ const Timer: React.FC = () => {
       </TaskInfo>
       
       <ButtonContainer>
-        <button onClick={() => stopTimer(activeTaskId)}>
+        <StopButton onClick={() => stopTimer(activeTaskId)}>
           Stop Timer
-        </button>
+        </StopButton>
       </ButtonContainer>
     </TimerContainer>
   );

@@ -2,6 +2,18 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
 import { format } from 'date-fns';
+import {
+  FormContainer,
+  FormRow,
+  FormRowHorizontal,
+  Label,
+  Input,
+  Select,
+  TextArea,
+  ButtonRow,
+  PrimaryButton,
+  SecondaryButton
+} from '../components/shared/FormStyles';
 
 const MeetingsContainer = styled.div`
   display: grid;
@@ -9,24 +21,19 @@ const MeetingsContainer = styled.div`
   gap: 16px;
 `;
 
-const MeetingForm = styled.div`
-  border: 1px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888;
-  padding: 16px;
-  margin-bottom: 16px;
-`;
-
 const MeetingList = styled.div`
   border: 1px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888;
+  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888, 0 3px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  background-color: #fff;
 `;
 
 const MeetingItem = styled.div<{ completed: boolean }>`
-  padding: 8px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid #dfdfdf;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   ${({ completed }) => completed && 'text-decoration: line-through; color: #888;'}
   
@@ -44,25 +51,50 @@ const NoMeetings = styled.div`
   padding: 32px;
   text-align: center;
   color: #888;
-`;
-
-const FormRow = styled.div`
-  margin-bottom: 8px;
-  display: flex;
-  flex-direction: column;
-`;
-
-const Label = styled.label`
-  margin-bottom: 4px;
+  font-size: 1.1rem;
 `;
 
 const MeetingTitle = styled.div`
   font-weight: bold;
+  font-size: 1.1rem;
 `;
 
 const MeetingInfo = styled.div`
-  font-size: 0.8em;
-  color: #888;
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 4px;
+`;
+
+const MeetingNotes = styled.div`
+  font-size: 0.9rem;
+  margin-top: 8px;
+  font-style: italic;
+  color: #555;
+`;
+
+const PageTitle = styled.h2`
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  font-weight: bold;
+  color: #333;
+`;
+
+const DeleteButton = styled.button`
+  background: linear-gradient(to bottom, #f96c6c, #e53e3e);
+  color: white;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #c53030;
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, #ff8080, #f05252);
+  }
+  
+  &:active {
+    background: #e53e3e;
+  }
 `;
 
 const Meetings: React.FC = () => {
@@ -105,13 +137,13 @@ const Meetings: React.FC = () => {
   
   return (
     <div>
-      <h2>Meetings</h2>
+      <PageTitle>Meetings</PageTitle>
       
-      <MeetingForm>
+      <FormContainer>
         <form onSubmit={handleSubmit}>
           <FormRow>
             <Label htmlFor="title">Title:</Label>
-            <input
+            <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -121,7 +153,7 @@ const Meetings: React.FC = () => {
           
           <FormRow>
             <Label htmlFor="description">Description:</Label>
-            <textarea
+            <TextArea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -129,42 +161,46 @@ const Meetings: React.FC = () => {
             />
           </FormRow>
           
-          <FormRow>
-            <Label htmlFor="date">Date and Time:</Label>
-            <input
-              id="date"
-              type="datetime-local"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </FormRow>
+          <FormRowHorizontal>
+            <FormRow>
+              <Label htmlFor="date">Date and Time:</Label>
+              <Input
+                id="date"
+                type="datetime-local"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </FormRow>
+            
+            <FormRow>
+              <Label htmlFor="duration">Duration (minutes):</Label>
+              <Input
+                id="duration"
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                min={5}
+                required
+              />
+            </FormRow>
+          </FormRowHorizontal>
           
-          <FormRow>
-            <Label htmlFor="duration">Duration (minutes):</Label>
-            <input
-              id="duration"
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-              min={5}
-              required
-            />
-          </FormRow>
-          
-          <FormRow>
-            <Label htmlFor="participants">Participants (comma separated):</Label>
-            <input
-              id="participants"
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              placeholder="John Doe, Jane Smith"
-            />
-          </FormRow>
+          <FormRowHorizontal>
+            <FormRow>
+              <Label htmlFor="participants">Participants (comma separated):</Label>
+              <Input
+                id="participants"
+                value={participants}
+                onChange={(e) => setParticipants(e.target.value)}
+                placeholder="John Doe, Jane Smith"
+              />
+            </FormRow>
+          </FormRowHorizontal>
           
           <FormRow>
             <Label htmlFor="notes">Notes:</Label>
-            <textarea
+            <TextArea
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -172,12 +208,12 @@ const Meetings: React.FC = () => {
             />
           </FormRow>
           
-          <div className="field-row">
-            <button type="submit">Add Meeting</button>
-            <button type="button" onClick={resetForm}>Reset</button>
-          </div>
+          <ButtonRow>
+            <PrimaryButton type="submit">Add Meeting</PrimaryButton>
+            <SecondaryButton type="button" onClick={resetForm}>Reset</SecondaryButton>
+          </ButtonRow>
         </form>
-      </MeetingForm>
+      </FormContainer>
       
       <MeetingList>
         {meetings.length === 0 ? (
@@ -200,16 +236,15 @@ const Meetings: React.FC = () => {
                   {meeting.participants.length > 0 && 
                     ` • Participants: ${meeting.participants.join(', ')}`}
                 </MeetingInfo>
-                {meeting.notes && <div><small>Notes: {meeting.notes}</small></div>}
+                {meeting.notes && <MeetingNotes>Notes: {meeting.notes}</MeetingNotes>}
               </div>
               
               <MeetingActions>
-                <button 
+                <DeleteButton 
                   onClick={() => deleteMeeting(meeting.id)}
-                  className="error"
                 >
                   Delete
-                </button>
+                </DeleteButton>
               </MeetingActions>
             </MeetingItem>
           ))
