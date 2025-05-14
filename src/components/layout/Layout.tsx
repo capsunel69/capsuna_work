@@ -3,7 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { format } from 'date-fns';
 import '98.css/dist/98.css';
+import '@react95/icons/icons.css';
+import { Computer3, BatWait, Awschd32402, Confcp118, Mspaint, Shell3213 } from '@react95/icons';
 import blissBackground from '../../assets/bliss-update.jpg';
+import { useAuth } from '../../context/AuthContext';
 
 const AppContainer = styled.div`
   height: 100vh;
@@ -88,15 +91,40 @@ const NavButton = styled.button`
   border-radius: 4px;
   box-shadow: ${props => props.className === 'active' ? 'inset 0 0 3px rgba(0, 0, 0, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.1)'};
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   
   &:hover {
     background-color: ${props => props.className === 'active' ? '#d8e9f9' : '#d0d0d0'};
+  }
+
+  i {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+  }
+`;
+
+const LogoutButton = styled.button`
+  margin-left: auto;
+  font-size: 1rem;
+  padding: 6px 12px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background-color: #e0e0e0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: #d0d0d0;
   }
 `;
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const { logout } = useAuth();
   
   // Update current time every minute
   useEffect(() => {
@@ -106,6 +134,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     
     return () => clearInterval(timer);
   }, []);
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to log out?')) {
+      logout();
+    }
+  };
 
   return (
     <AppContainer>
@@ -130,29 +164,38 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <NavBar>
           <Link to="/">
             <NavButton className={location.pathname === '/' ? 'active' : ''}>
+              <Computer3 />
               Dashboard
             </NavButton>
           </Link>
           <Link to="/tasks">
             <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>
+              <BatWait />
               Tasks
             </NavButton>
           </Link>
           <Link to="/meetings">
             <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>
+              <Awschd32402 />
               Meetings
             </NavButton>
           </Link>
           <Link to="/reminders">
             <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
+              <Confcp118 />
               Reminders
             </NavButton>
           </Link>
           <Link to="/journals">
             <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
+              <Mspaint />
               Journals
             </NavButton>
           </Link>
+          <LogoutButton onClick={handleLogout}>
+            <Shell3213 />
+            Logout
+          </LogoutButton>
         </NavBar>
 
         <WindowContent>
