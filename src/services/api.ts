@@ -1,4 +1,4 @@
-import type { Task, Meeting, Reminder } from '../types';
+import type { Task, Meeting, Reminder, Journal } from '../types';
 
 // Use import.meta.env instead of process.env for Vite
 const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions';
@@ -111,4 +111,39 @@ export const RemindersAPI = {
     fetchApi<{ message: string }>(`reminders/${id}`, {
       method: 'DELETE',
     }),
+};
+
+// Journals API
+export const JournalsAPI = {
+  getAll: (): Promise<Journal[]> => fetchApi<Journal[]>('journals'),
+  
+  getById: (id: string): Promise<Journal> => fetchApi<Journal>(`journals/${id}`),
+  
+  create: (journal: Omit<Journal, 'id' | 'createdAt'>): Promise<Journal> => 
+    fetchApi<Journal>('journals', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...journal,
+        id: crypto.randomUUID(), // Generate id on client side
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }),
+    }),
+  
+  update: (id: string, updates: Partial<Journal>): Promise<Journal> => 
+    fetchApi<Journal>(`journals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...updates,
+        updatedAt: new Date()
+      }),
+    }),
+  
+  delete: (id: string): Promise<{ message: string }> => 
+    fetchApi<{ message: string }>(`journals/${id}`, {
+      method: 'DELETE',
+    }),
+    
+  search: (query: string): Promise<Journal[]> => 
+    fetchApi<Journal[]>(`journals/search?q=${encodeURIComponent(query)}`),
 }; 

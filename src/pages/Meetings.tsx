@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import styled from 'styled-components';
 import { format } from 'date-fns';
+import styled from 'styled-components';
+import type { Meeting } from '../types';
 import {
   FormContainer,
   FormRow,
@@ -9,18 +10,12 @@ import {
   Label,
   Input,
   DateInput,
-  Select,
   TextArea,
   ButtonRow,
   PrimaryButton,
   SecondaryButton
 } from '../components/shared/FormStyles';
 
-const MeetingsContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-`;
 
 const MeetingList = styled.div`
   border: 1px solid #dfdfdf;
@@ -208,7 +203,7 @@ const Meetings: React.FC = () => {
   };
   
   // Handle opening notes modal
-  const handleOpenNotesModal = (meeting: any) => {
+  const handleOpenNotesModal = (meeting: Meeting) => {
     setEditingMeetingId(meeting.id);
     setEditingNotes(meeting.notes || '');
     setIsNotesModalOpen(true);
@@ -235,7 +230,7 @@ const Meetings: React.FC = () => {
             <Input
               id="title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
               required
             />
           </FormRow>
@@ -245,7 +240,7 @@ const Meetings: React.FC = () => {
             <TextArea
               id="description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
               rows={3}
             />
           </FormRow>
@@ -257,7 +252,7 @@ const Meetings: React.FC = () => {
                 id="date"
                 type="datetime-local"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)}
                 required
               />
             </FormRow>
@@ -268,7 +263,7 @@ const Meetings: React.FC = () => {
                 id="duration"
                 type="number"
                 value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDuration(Number(e.target.value))}
                 min={5}
                 required
               />
@@ -281,7 +276,7 @@ const Meetings: React.FC = () => {
               <Input
                 id="participants"
                 value={participants}
-                onChange={(e) => setParticipants(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setParticipants(e.target.value)}
                 placeholder="John Doe, Jane Smith"
               />
             </FormRow>
@@ -292,7 +287,7 @@ const Meetings: React.FC = () => {
             <TextArea
               id="notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
               rows={3}
             />
           </FormRow>
@@ -368,7 +363,7 @@ const Meetings: React.FC = () => {
                 <TextArea
                   id="modalNotes"
                   value={editingNotes}
-                  onChange={e => setEditingNotes(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditingNotes(e.target.value)}
                   rows={6}
                   autoFocus
                 />

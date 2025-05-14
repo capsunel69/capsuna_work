@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Task, Meeting, Reminder, TimerSession } from '../types';
-import { TasksAPI, MeetingsAPI, RemindersAPI } from '../services/api';
+import type { Task, Meeting, Reminder, TimerSession, Journal } from '../types';
+import { TasksAPI, MeetingsAPI, RemindersAPI, JournalsAPI } from '../services/api';
 
 interface AppContextType {
   // Tasks
@@ -25,6 +25,13 @@ interface AppContextType {
   deleteReminder: (reminderId: string) => void;
   toggleReminderCompletion: (reminderId: string) => void;
   convertReminderToTask: (reminderId: string) => void;
+  
+  // Journals
+  journals: Journal[];
+  addJournal: (journal: Omit<Journal, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateJournal: (journalId: string, updates: Partial<Journal>) => void;
+  deleteJournal: (journalId: string) => void;
+  searchJournals: (query: string) => Promise<Journal[]>;
   
   // Timer
   startTimer: (taskId: string) => void;
@@ -64,6 +71,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]); 
+  const [journals, setJournals] = useState<Journal[]>([]);
   
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
@@ -82,15 +90,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       try {
         // Fetch tasks, meetings, and reminders in parallel
-        const [tasksData, meetingsData, remindersData] = await Promise.all([
+        const [tasksData, meetingsData, remindersData, journalsData] = await Promise.all([
           TasksAPI.getAll(),
           MeetingsAPI.getAll(),
-          RemindersAPI.getAll()
+          RemindersAPI.getAll(),
+          JournalsAPI.getAll()
         ]);
         
         setTasks(tasksData);
         setMeetings(meetingsData);
         setReminders(remindersData);
+        setJournals(journalsData);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Using local data instead.');
@@ -99,6 +109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTasks(loadFromLocalStorage('tasks', []));
         setMeetings(loadFromLocalStorage('meetings', []));
         setReminders(loadFromLocalStorage('reminders', []));
+        setJournals(loadFromLocalStorage('journals', []));
       } finally {
         setIsLoading(false);
       }
@@ -119,6 +130,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (reminders.length > 0) saveToLocalStorage('reminders', reminders);
   }, [reminders]);
+
+  useEffect(() => {
+    if (journals.length > 0) saveToLocalStorage('journals', journals);
+  }, [journals]);
   
   // Clean up timer interval when component unmounts
   useEffect(() => {
@@ -556,6 +571,104 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [reminders]);
 
+  // Journal functions
+  const addJournal = useCallback(async (journal: Omit<Journal, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newJournal = await JournalsAPI.create(journal);
+      setJournals(prev => [...prev, newJournal]);
+    } catch (err) {
+      console.error('Error adding journal:', err);
+      setError('Failed to add journal');
+      
+      // Add to local state even if API fails
+      const localJournal: Journal = {
+        ...journal,
+        id: uuidv4(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      setJournals(prev => [...prev, localJournal]);
+    }
+  }, []);
+
+  const updateJournal = useCallback(async (journalId: string, updates: Partial<Journal>) => {
+    try {
+      // Find the current journal
+      const currentJournal = journals.find(j => j.id === journalId);
+      if (!currentJournal) return;
+      
+      // Check if there are actual changes to save
+      let hasChanges = false;
+      
+      for (const key in updates) {
+        if (key === 'updatedAt') continue; // Ignore updatedAt changes
+        
+        const typedKey = key as keyof Journal;
+        if (typedKey === 'tags') {
+          // Special handling for arrays
+          const currentTags = currentJournal.tags || [];
+          const newTags = updates.tags || [];
+          
+          if (JSON.stringify(currentTags) !== JSON.stringify(newTags)) {
+            hasChanges = true;
+            break;
+          }
+        } else if (updates[typedKey] !== currentJournal[typedKey]) {
+          hasChanges = true;
+          break;
+        }
+      }
+      
+      if (!hasChanges) {
+        // No actual changes, skip API call
+        return;
+      }
+      
+      const updatedJournal = await JournalsAPI.update(journalId, updates);
+      setJournals(prev => prev.map(journal => journal.id === journalId ? updatedJournal : journal));
+    } catch (err) {
+      console.error('Error updating journal:', err);
+      setError('Failed to update journal');
+      
+      // Update local state even if API fails
+      setJournals(prev => prev.map(journal => journal.id === journalId ? { 
+        ...journal, 
+        ...updates, 
+        updatedAt: new Date() 
+      } : journal));
+    }
+  }, [journals]);
+
+  const deleteJournal = useCallback(async (journalId: string) => {
+    try {
+      await JournalsAPI.delete(journalId);
+      setJournals(prev => prev.filter(journal => journal.id !== journalId));
+    } catch (err) {
+      console.error('Error deleting journal:', err);
+      setError('Failed to delete journal');
+      
+      // Delete from local state even if API fails
+      setJournals(prev => prev.filter(journal => journal.id !== journalId));
+    }
+  }, []);
+
+  const searchJournals = useCallback(async (query: string): Promise<Journal[]> => {
+    try {
+      return await JournalsAPI.search(query);
+    } catch (err) {
+      console.error('Error searching journals:', err);
+      setError('Failed to search journals');
+      
+      // Local search fallback
+      return journals.filter(journal => 
+        journal.title.toLowerCase().includes(query.toLowerCase()) || 
+        journal.content.toLowerCase().includes(query.toLowerCase()) ||
+        (journal.tags && journal.tags.some(tag => 
+          tag.toLowerCase().includes(query.toLowerCase())))
+      );
+    }
+  }, [journals]);
+
   return (
     <AppContext.Provider
       value={{
@@ -577,6 +690,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteReminder,
         toggleReminderCompletion,
         convertReminderToTask,
+        
+        journals,
+        addJournal,
+        updateJournal,
+        deleteJournal,
+        searchJournals,
         
         startTimer,
         stopTimer,

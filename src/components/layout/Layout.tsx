@@ -116,7 +116,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               location.pathname === '/' ? 'Dashboard' :
               location.pathname === '/tasks' ? 'Tasks' :
               location.pathname === '/meetings' ? 'Meetings' :
-              location.pathname === '/reminders' ? 'Reminders' : ''
+              location.pathname === '/reminders' ? 'Reminders' :
+              location.pathname === '/journals' ? 'Journals' : ''
             }
           </div>
           <div className="title-bar-controls">
@@ -145,6 +146,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Link to="/reminders">
             <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
               Reminders
+            </NavButton>
+          </Link>
+          <Link to="/journals">
+            <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
+              Journals
             </NavButton>
           </Link>
         </NavBar>

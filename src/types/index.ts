@@ -40,6 +40,16 @@ export interface Reminder {
   completedInstances?: Date[]; // Dates when recurring reminder was completed
 }
 
+export interface Journal {
+  id: string;
+  title: string;
+  content: string;
+  date: Date;
+  createdAt: Date;
+  updatedAt?: Date;
+  tags?: string[];
+}
+
 export interface TimerSession {
   id: string;
   startTime: Date;
