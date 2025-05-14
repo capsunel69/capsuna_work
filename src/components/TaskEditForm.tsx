@@ -7,6 +7,7 @@ import {
   FormRowHorizontal,
   Label,
   Input,
+  DateInput,
   Select,
   TextArea,
   ButtonRow,
@@ -88,7 +89,7 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel }) =
           
           <FormRow>
             <Label htmlFor="edit-dueDate">Due Date (optional):</Label>
-            <Input
+            <DateInput
               id="edit-dueDate"
               type="datetime-local"
               value={dueDate}

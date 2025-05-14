@@ -1,25 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import {
   FormContainer,
   FormRow,
   FormRowHorizontal,
   Label,
   Input,
+  DateInput,
   Select,
   TextArea,
   ButtonRow,
   PrimaryButton,
   SecondaryButton
 } from '../components/shared/FormStyles';
-
-const RemindersContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-`;
 
 const ReminderList = styled.div`
   border: 1px solid #dfdfdf;
@@ -28,7 +23,7 @@ const ReminderList = styled.div`
   background-color: #fff;
 `;
 
-const ReminderItem = styled.div<{ completed: boolean }>`
+const ReminderItem = styled.div<{ completed: boolean; convertedToTask?: boolean; isToday?: boolean }>`
   padding: 12px 16px;
   border-bottom: 1px solid #dfdfdf;
   display: grid;
@@ -36,15 +31,12 @@ const ReminderItem = styled.div<{ completed: boolean }>`
   gap: 12px;
   align-items: center;
   ${({ completed }) => completed && 'text-decoration: line-through; color: #888;'}
+  ${({ convertedToTask }) => convertedToTask && 'background-color: #f0f9ff;'}
+  ${({ isToday }) => isToday && 'background-color: #f0fff4;'}
   
   &:last-child {
     border-bottom: none;
   }
-`;
-
-const ReminderActions = styled.div`
-  display: flex;
-  gap: 8px;
 `;
 
 const NoReminders = styled.div`
@@ -90,8 +82,53 @@ const DeleteButton = styled.button`
   }
 `;
 
+const ConvertButton = styled.button`
+  background: linear-gradient(to bottom, #4f94ea, #3a7bd5);
+  color: white;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #2c5ea9;
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, #5ca0ff, #4485e6);
+  }
+  
+  &:active {
+    background: #3a7bd5;
+  }
+  
+  &:disabled {
+    background: #cccccc;
+    border-color: #bbbbbb;
+    color: #888888;
+    cursor: not-allowed;
+  }
+`;
+
+const TagsContainer = styled.div`
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+`;
+
+const Tag = styled.span<{ type: 'today' | 'converted' }>`
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: white;
+  background-color: ${props => props.type === 'today' ? '#4299e1' : '#805ad5'};
+`;
+
 const ConditionalWrapper = styled.div<{ show: boolean }>`
   display: ${props => props.show ? 'block' : 'none'};
+`;
+
+const ReminderActions = styled.div`
+  display: flex;
+  gap: 8px;
 `;
 
 const daysOfWeek = [
@@ -113,7 +150,7 @@ const weekNumbers = [
 ];
 
 const Reminders: React.FC = () => {
-  const { reminders, addReminder, updateReminder, deleteReminder, toggleReminderCompletion } = useAppContext();
+  const { reminders, addReminder, deleteReminder, toggleReminderCompletion, tasks, convertReminderToTask } = useAppContext();
   
   // Form state
   const [title, setTitle] = useState('');
@@ -164,6 +201,36 @@ const Reminders: React.FC = () => {
     setMonthlyDay(1);
     setMonthlyWeekNum(1);
     setMonthlyWeekDay(1);
+  };
+  
+  // Check if a reminder is due today
+  const isReminderDueToday = (reminder: any) => {
+    if (!reminder.recurring) {
+      return isToday(new Date(reminder.date));
+    }
+    
+    // For recurring reminders, check based on the recurrence pattern
+    const now = new Date();
+    
+    if (reminder.recurring === 'daily') {
+      return true; // Daily reminders are due every day
+    }
+    
+    if (reminder.recurring === 'weekly' && reminder.recurringConfig) {
+      return now.getDay() === reminder.recurringConfig.dayOfWeek;
+    }
+    
+    if (reminder.recurring === 'monthly' && reminder.recurringConfig) {
+      if (reminder.recurringConfig.subtype === 'dayOfMonth') {
+        return now.getDate() === reminder.recurringConfig.dayOfMonth;
+      } else if (reminder.recurringConfig.subtype === 'relativeDay') {
+        // This is a complex calculation, but it's the same as in Dashboard.tsx
+        // Could be refactored into a utility function
+        return false;
+      }
+    }
+    
+    return false;
   };
   
   // Generate full date string from date and time inputs
@@ -350,6 +417,11 @@ const Reminders: React.FC = () => {
     return `• Recurring: ${reminder.recurring}`;
   };
   
+  // Handle converting reminder to task
+  const handleConvertToTask = (reminderId: string) => {
+    convertReminderToTask(reminderId);
+  };
+  
   return (
     <div>
       <PageTitle>Reminders</PageTitle>
@@ -406,7 +478,7 @@ const Reminders: React.FC = () => {
           <ConditionalWrapper show={showDateField}>
             <FormRow>
               <Label htmlFor="date">Date:</Label>
-              <Input
+              <DateInput
                 id="date"
                 type="date"
                 value={date}
@@ -512,32 +584,62 @@ const Reminders: React.FC = () => {
         {reminders.length === 0 ? (
           <NoReminders>No reminders yet. Add one above!</NoReminders>
         ) : (
-          reminders.map(reminder => (
-            <ReminderItem key={reminder.id} completed={reminder.completed}>
-              <input
-                type="checkbox"
-                checked={reminder.completed}
-                onChange={() => toggleReminderCompletion(reminder.id)}
-              />
-              
-              <div>
-                <ReminderTitle>{reminder.title}</ReminderTitle>
-                {reminder.description && <div>{reminder.description}</div>}
-                <ReminderInfo>
-                  {!reminder.recurring && `Due: ${format(new Date(reminder.date), 'MMM d, yyyy h:mm a')}`}
-                  {reminder.recurring && formatRecurringDisplay(reminder)}
-                </ReminderInfo>
-              </div>
-              
-              <ReminderActions>
-                <DeleteButton 
-                  onClick={() => deleteReminder(reminder.id)}
-                >
-                  Delete
-                </DeleteButton>
-              </ReminderActions>
-            </ReminderItem>
-          ))
+          reminders.map(reminder => {
+            const isDueToday = isReminderDueToday(reminder);
+            // Find a task that might be associated with this reminder (if any)
+            const associatedTask = tasks.find(t => t.convertedFromReminder === reminder.id);
+            
+            return (
+              <ReminderItem 
+                key={reminder.id} 
+                completed={reminder.completed}
+                convertedToTask={reminder.convertedToTask}
+                isToday={isDueToday && !reminder.convertedToTask}
+              >
+                <input
+                  type="checkbox"
+                  checked={reminder.completed}
+                  onChange={() => toggleReminderCompletion(reminder.id)}
+                  disabled={reminder.convertedToTask}
+                />
+                
+                <div>
+                  <ReminderTitle>
+                    {reminder.title}
+                    <TagsContainer>
+                      {isDueToday && !reminder.convertedToTask && (
+                        <Tag type="today">TODAY</Tag>
+                      )}
+                      {reminder.convertedToTask && (
+                        <Tag type="converted">TASK CREATED</Tag>
+                      )}
+                    </TagsContainer>
+                  </ReminderTitle>
+                  {reminder.description && <div>{reminder.description}</div>}
+                  <ReminderInfo>
+                    {!reminder.recurring && `Due: ${format(new Date(reminder.date), 'MMM d, yyyy h:mm a')}`}
+                    {reminder.recurring && formatRecurringDisplay(reminder)}
+                    {associatedTask && ` • Created Task: ${associatedTask.title}`}
+                  </ReminderInfo>
+                </div>
+                
+                <ReminderActions>
+                  {!reminder.convertedToTask && isDueToday && (
+                    <ConvertButton 
+                      onClick={() => handleConvertToTask(reminder.id)}
+                    >
+                      Add as Task
+                    </ConvertButton>
+                  )}
+                  <DeleteButton 
+                    onClick={() => deleteReminder(reminder.id)}
+                  >
+                    Delete
+                  </DeleteButton>
+                </ReminderActions>
+              </ReminderItem>
+            );
+          })
         )}
       </ReminderList>
     </div>

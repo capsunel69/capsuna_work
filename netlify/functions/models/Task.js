@@ -53,7 +53,11 @@ const TaskSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  timers: [TimerSessionSchema]
+  timers: [TimerSessionSchema],
+  convertedFromReminder: {
+    type: String,
+    default: null
+  }
 }, {
   collection: 'tasks',
   timestamps: true

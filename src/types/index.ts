@@ -8,6 +8,7 @@ export interface Task {
   dueDate?: Date;
   timeSpent: number; // in seconds
   timers: TimerSession[];
+  convertedFromReminder?: string; // ID of the reminder this task was converted from
 }
 
 export interface Meeting {
@@ -35,6 +36,8 @@ export interface Reminder {
     dayOfMonth?: number;
     weekNum?: number;
   };
+  convertedToTask?: boolean; // Whether this reminder has been converted to a task
+  completedInstances?: Date[]; // Dates when recurring reminder was completed
 }
 
 export interface TimerSession {

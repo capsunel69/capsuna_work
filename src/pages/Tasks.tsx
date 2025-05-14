@@ -8,6 +8,7 @@ import {
   FormRowHorizontal,
   Label,
   Input,
+  DateInput,
   Select,
   TextArea,
   ButtonRow,
@@ -19,17 +20,24 @@ import TaskEditForm from '../components/TaskEditForm';
 import LoadingState from '../components/shared/LoadingState';
 import ErrorMessage from '../components/shared/ErrorMessage';
 
-const TasksContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-`;
-
 const TaskList = styled.div`
   border: 1px solid #dfdfdf;
   box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888, 0 3px 8px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   background-color: #fff;
+  margin-bottom: 24px;
+`;
+
+const TaskListHeader = styled.div`
+  padding: 12px 16px;
+  background: linear-gradient(to bottom, #f0f0f0, #e1e1e1);
+  border-bottom: 1px solid #dfdfdf;
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
 
 const TaskItem = styled.div<{ completed: boolean }>`
@@ -119,6 +127,53 @@ const ActionButton = styled.button`
   }
 `;
 
+const ToggleButton = styled.button`
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  background: linear-gradient(to bottom, #e6e6e6, #d5d5d5);
+  color: #333;
+  border-radius: 4px;
+  border: 1px solid #b9b9b9;
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+  }
+  
+  &:active {
+    background: #d5d5d5;
+  }
+`;
+
+const ConvertedTag = styled.span`
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #805ad5;
+  color: white;
+  border-radius: 3px;
+  font-size: 0.75rem;
+`;
+
+
+const CompleteButton = styled.button<{ completed: boolean }>`
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  background: linear-gradient(to bottom, ${props => props.completed ? '#38a169' : '#4f94ea'}, ${props => props.completed ? '#2f855a' : '#3a7bd5'});
+  color: white;
+  border-radius: 4px;
+  border: 1px solid ${props => props.completed ? '#2c7a50' : '#2c5ea9'};
+  cursor: pointer;
+  
+  &:hover {
+    background: linear-gradient(to bottom, ${props => props.completed ? '#48b179' : '#5ca0ff'}, ${props => props.completed ? '#3f9569' : '#4485e6'});
+  }
+  
+  &:active {
+    background: ${props => props.completed ? '#2f855a' : '#3a7bd5'};
+  }
+`;
+
 const Tasks: React.FC = () => {
   const { 
     tasks, 
@@ -141,6 +196,9 @@ const Tasks: React.FC = () => {
   
   // Edit state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  
+  // Toggle state for completed tasks visibility
+  const [showCompletedTasks, setShowCompletedTasks] = useState(true);
   
   // Reset form
   const resetForm = () => {
@@ -184,6 +242,10 @@ const Tasks: React.FC = () => {
     updateTask(taskId, updates);
     setEditingTaskId(null);
   };
+  
+  // Filter tasks by completion status
+  const incompleteTasks = tasks.filter(task => !task.completed);
+  const completedTasks = tasks.filter(task => task.completed);
   
   if (isLoading) {
     return <LoadingState message="Loading tasks..." />;
@@ -235,7 +297,7 @@ const Tasks: React.FC = () => {
             
             <FormRow>
               <Label htmlFor="dueDate">Due Date (optional):</Label>
-              <Input
+              <DateInput
                 id="dueDate"
                 type="datetime-local"
                 value={dueDate}
@@ -251,11 +313,16 @@ const Tasks: React.FC = () => {
         </form>
       </FormContainer>
       
+      {/* Active tasks */}
       <TaskList>
-        {tasks.length === 0 ? (
-          <NoTasks>No tasks yet. Add one above!</NoTasks>
+        <TaskListHeader>
+          <span>Active Tasks ({incompleteTasks.length})</span>
+        </TaskListHeader>
+        
+        {incompleteTasks.length === 0 ? (
+          <NoTasks>No active tasks. Add one above!</NoTasks>
         ) : (
-          tasks.map(task => (
+          incompleteTasks.map(task => (
             <React.Fragment key={task.id}>
               {editingTaskId === task.id ? (
                 <TaskEditForm 
@@ -275,6 +342,7 @@ const Tasks: React.FC = () => {
                     <TaskTitle>
                       {task.title}
                       {isOverdue(task) && <OverdueTag>OVERDUE</OverdueTag>}
+                      {task.convertedFromReminder && <ConvertedTag>FROM REMINDER</ConvertedTag>}
                     </TaskTitle>
                     {task.description && <div>{task.description}</div>}
                     <TaskInfo>
@@ -282,6 +350,15 @@ const Tasks: React.FC = () => {
                       {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
                       {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
                     </TaskInfo>
+                  </div>
+                  
+                  <div>
+                    <CompleteButton 
+                      completed={task.completed}
+                      onClick={() => toggleTaskCompletion(task.id)}
+                    >
+                      Mark Complete
+                    </CompleteButton>
                   </div>
                   
                   <div>
@@ -300,11 +377,14 @@ const Tasks: React.FC = () => {
                   </div>
                   
                   <TaskActions>
-                    <ActionButton 
-                      onClick={() => setEditingTaskId(task.id)}
-                    >
-                      Edit
-                    </ActionButton>
+                    {/* Do not show Edit button for tasks linked to reminders */}
+                    {!task.convertedFromReminder && (
+                      <ActionButton 
+                        onClick={() => setEditingTaskId(task.id)}
+                      >
+                        Edit
+                      </ActionButton>
+                    )}
                     <DeleteButton 
                       onClick={() => deleteTask(task.id)}
                     >
@@ -317,6 +397,72 @@ const Tasks: React.FC = () => {
           ))
         )}
       </TaskList>
+      
+      {/* Completed tasks */}
+      {completedTasks.length > 0 && (
+        <TaskList>
+          <TaskListHeader>
+            <span>Completed Tasks ({completedTasks.length})</span>
+            <ToggleButton 
+              onClick={() => setShowCompletedTasks(!showCompletedTasks)}
+            >
+              {showCompletedTasks ? 'Hide' : 'Show'}
+            </ToggleButton>
+          </TaskListHeader>
+          
+          {showCompletedTasks && completedTasks.map(task => (
+            <TaskItem key={task.id} completed={task.completed}>
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={() => toggleTaskCompletion(task.id)}
+              />
+              
+              <div>
+                <TaskTitle>
+                  {task.title}
+                  {task.convertedFromReminder && <ConvertedTag>FROM REMINDER</ConvertedTag>}
+                </TaskTitle>
+                {task.description && <div>{task.description}</div>}
+                <TaskInfo>
+                  Priority: {task.priority}
+                  {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
+                  {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
+                </TaskInfo>
+              </div>
+              
+              <div>
+                <CompleteButton 
+                  completed={task.completed}
+                  onClick={() => toggleTaskCompletion(task.id)}
+                >
+                  Mark Incomplete
+                </CompleteButton>
+              </div>
+              
+              <div>
+                {/* No timer actions for completed tasks */}
+              </div>
+              
+              <TaskActions>
+                {/* Do not show Edit button for tasks linked to reminders */}
+                {!task.convertedFromReminder && !task.completed && (
+                  <ActionButton 
+                    onClick={() => setEditingTaskId(task.id)}
+                  >
+                    Edit
+                  </ActionButton>
+                )}
+                <DeleteButton 
+                  onClick={() => deleteTask(task.id)}
+                >
+                  Delete
+                </DeleteButton>
+              </TaskActions>
+            </TaskItem>
+          ))}
+        </TaskList>
+      )}
     </div>
   );
 };

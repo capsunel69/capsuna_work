@@ -47,6 +47,33 @@ export const Input = styled.input`
   }
 `;
 
+// Date input styling with calendar icon moved to the left
+export const DateInput = styled(Input)`
+  &::-webkit-calendar-picker-indicator {
+    order: -1;
+    margin-right: 10px;
+    margin-left: -5px;
+  }
+  
+  &[type="datetime-local"] {
+    display: flex;
+    align-items: center;
+  }
+  
+  /* Moving calendar picker icon to the left in Firefox */
+  @supports (-moz-appearance: none) {
+    &[type="datetime-local"] {
+      position: relative;
+      padding-left: 30px;
+    }
+    
+    &[type="datetime-local"]::-moz-calendar-picker-indicator {
+      position: absolute;
+      left: 8px;
+    }
+  }
+`;
+
 // Select field styling
 export const Select = styled.select`
   height: 38px;

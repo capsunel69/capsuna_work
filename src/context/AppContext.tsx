@@ -24,6 +24,7 @@ interface AppContextType {
   updateReminder: (reminderId: string, updates: Partial<Reminder>) => void;
   deleteReminder: (reminderId: string) => void;
   toggleReminderCompletion: (reminderId: string) => void;
+  convertReminderToTask: (reminderId: string) => void;
   
   // Timer
   startTimer: (taskId: string) => void;
@@ -163,17 +164,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const deleteTask = useCallback(async (taskId: string) => {
+    // Find the task first to check if it's linked to a reminder
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    // Check if this task was converted from a reminder
+    const reminderToReset = task.convertedFromReminder ? 
+      reminders.find(r => r.id === task.convertedFromReminder) : null;
+    
     try {
+      // Delete the task
       await TasksAPI.delete(taskId);
       setTasks(prev => prev.filter(task => task.id !== taskId));
+      
+      // If this task was linked to a reminder, reset the reminder
+      if (reminderToReset) {
+        const updatedReminder = await RemindersAPI.update(reminderToReset.id, {
+          convertedToTask: false,
+          completed: false, // Also reset completed status
+        });
+        
+        setReminders(prev => prev.map(r => 
+          r.id === reminderToReset.id ? updatedReminder : r
+        ));
+      }
     } catch (err) {
       console.error('Error deleting task:', err);
       setError('Failed to delete task');
       
       // Delete from local state even if API fails
       setTasks(prev => prev.filter(task => task.id !== taskId));
+      
+      // Also try to reset the reminder locally if API fails
+      if (reminderToReset) {
+        setReminders(prev => prev.map(r => 
+          r.id === reminderToReset.id ? { ...r, convertedToTask: false, completed: false } : r
+        ));
+      }
     }
-  }, []);
+  }, [tasks, reminders]);
 
   const toggleTaskCompletion = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -182,14 +211,125 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const updatedTask = await TasksAPI.update(taskId, { completed: !task.completed });
       setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+      
+      // If this task was converted from a reminder, update the reminder status accordingly
+      if (task.convertedFromReminder) {
+        const associatedReminder = reminders.find(r => r.id === task.convertedFromReminder);
+        
+        if (associatedReminder) {
+          if (task.completed) {
+            // Task was uncompleted, reset the reminder status for recurring reminders
+            if (associatedReminder.recurring) {
+              // For recurring reminders, remove today from completedInstances if present
+              // This allows the reminder to show up again on the next occurrence
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              const updatedCompletedInstances = associatedReminder.completedInstances ? 
+                associatedReminder.completedInstances.filter(date => {
+                  const completedDate = new Date(date);
+                  completedDate.setHours(0, 0, 0, 0);
+                  return completedDate.getTime() !== today.getTime();
+                }) : [];
+              
+              await RemindersAPI.update(associatedReminder.id, {
+                completedInstances: updatedCompletedInstances,
+                // For non-recurring reminders, keep convertedToTask true
+                // This prevents creating duplicate tasks
+              });
+              
+              // Update the reminders state
+              setReminders(prev => prev.map(r => 
+                r.id === associatedReminder.id ? 
+                { ...r, completedInstances: updatedCompletedInstances } : r
+              ));
+            } else {
+              // For non-recurring reminders, mark as not completed
+              // But keep convertedToTask true
+              await RemindersAPI.update(associatedReminder.id, {
+                completed: false
+              });
+              
+              // Update the reminders state
+              setReminders(prev => prev.map(r => 
+                r.id === associatedReminder.id ? { ...r, completed: false } : r
+              ));
+            }
+          } else {
+            // Task was completed, mark the reminder as completed or add today to completedInstances
+            if (associatedReminder.recurring) {
+              // For recurring reminders, add today to completedInstances
+              const today = new Date();
+              const completedInstances = associatedReminder.completedInstances || [];
+              
+              await RemindersAPI.update(associatedReminder.id, {
+                completedInstances: [...completedInstances, today]
+              });
+              
+              // Update the reminders state
+              setReminders(prev => prev.map(r => 
+                r.id === associatedReminder.id ? 
+                { ...r, completedInstances: [...completedInstances, today] } : r
+              ));
+            } else {
+              // For non-recurring reminders, mark as completed
+              await RemindersAPI.update(associatedReminder.id, {
+                completed: true
+              });
+              
+              // Update the reminders state
+              setReminders(prev => prev.map(r => 
+                r.id === associatedReminder.id ? { ...r, completed: true } : r
+              ));
+            }
+          }
+        }
+      }
     } catch (err) {
       console.error('Error toggling task completion:', err);
       setError('Failed to update task');
       
       // Update local state even if API fails
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
+      
+      // Also try to update the reminder state locally if API fails
+      if (task.convertedFromReminder) {
+        const associatedReminder = reminders.find(r => r.id === task.convertedFromReminder);
+        if (associatedReminder) {
+          if (associatedReminder.recurring) {
+            const today = new Date();
+            const completedInstances = associatedReminder.completedInstances || [];
+            
+            if (task.completed) {
+              // Remove today from completedInstances
+              setReminders(prev => prev.map(r => 
+                r.id === associatedReminder.id ? 
+                { 
+                  ...r, 
+                  completedInstances: completedInstances.filter(date => {
+                    const completedDate = new Date(date);
+                    completedDate.setHours(0, 0, 0, 0);
+                    return completedDate.getTime() !== today.setHours(0, 0, 0, 0);
+                  }) 
+                } : r
+              ));
+            } else {
+              // Add today to completedInstances
+              setReminders(prev => prev.map(r => 
+                r.id === associatedReminder.id ? 
+                { ...r, completedInstances: [...completedInstances, today] } : r
+              ));
+            }
+          } else {
+            // For non-recurring reminders, toggle completed status
+            setReminders(prev => prev.map(r => 
+              r.id === associatedReminder.id ? { ...r, completed: !task.completed } : r
+            ));
+          }
+        }
+      }
     }
-  }, [tasks]);
+  }, [tasks, reminders]);
 
   // Meeting functions
   const addMeeting = useCallback(async (meeting: Omit<Meeting, 'id'>) => {
@@ -362,6 +502,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentTimer(0);
   }, [currentTimer, tasks, updateTask]);
 
+  // Convert a reminder to a task
+  const convertReminderToTask = useCallback(async (reminderId: string) => {
+    const reminder = reminders.find(r => r.id === reminderId);
+    if (!reminder) return;
+    
+    try {
+      // Create a new task based on the reminder
+      const newTask = {
+        title: reminder.title,
+        description: reminder.description,
+        priority: 'medium' as const,
+        completed: false,
+        dueDate: new Date(reminder.date),
+        convertedFromReminder: reminder.id
+      };
+      
+      // Add the task
+      const createdTask = await TasksAPI.create(newTask);
+      setTasks(prev => [...prev, createdTask]);
+      
+      // Update the reminder to mark it as converted
+      const updatedReminder = await RemindersAPI.update(reminderId, { 
+        convertedToTask: true 
+      });
+      
+      setReminders(prev => prev.map(r => 
+        r.id === reminderId ? updatedReminder : r
+      ));
+      
+    } catch (err) {
+      console.error('Error converting reminder to task:', err);
+      setError('Failed to convert reminder to task');
+      
+      // Fallback to local state if API fails
+      const newTask: Task = {
+        id: uuidv4(),
+        title: reminder.title,
+        description: reminder.description,
+        priority: 'medium',
+        completed: false,
+        createdAt: new Date(),
+        dueDate: new Date(reminder.date),
+        timeSpent: 0,
+        timers: [],
+        convertedFromReminder: reminder.id
+      };
+      
+      setTasks(prev => [...prev, newTask]);
+      setReminders(prev => prev.map(r => 
+        r.id === reminderId ? { ...r, convertedToTask: true } : r
+      ));
+    }
+  }, [reminders]);
+
   return (
     <AppContext.Provider
       value={{
@@ -382,6 +576,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateReminder,
         deleteReminder,
         toggleReminderCompletion,
+        convertReminderToTask,
         
         startTimer,
         stopTimer,

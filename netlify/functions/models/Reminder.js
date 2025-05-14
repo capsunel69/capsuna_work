@@ -58,6 +58,14 @@ const ReminderSchema = new mongoose.Schema({
   },
   recurringConfig: {
     type: RecurringConfigSchema
+  },
+  convertedToTask: {
+    type: Boolean,
+    default: false
+  },
+  completedInstances: {
+    type: [Date],
+    default: []
   }
 }, {
   collection: 'reminders', // Explicitly set collection name
