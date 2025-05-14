@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { format } from 'date-fns';
 import styled from 'styled-components';
 import type { Meeting } from '../types';
+import { OverdueTag } from '../components/shared/TagStyles';
 import {
   FormContainer,
   FormRow,
@@ -312,7 +313,12 @@ const Meetings: React.FC = () => {
               />
               
               <div>
-                <MeetingTitle>{meeting.title}</MeetingTitle>
+                <MeetingTitle>
+                  {meeting.title}
+                  {!meeting.completed && new Date(meeting.date) < new Date() && (
+                    <OverdueTag>OVERDUE</OverdueTag>
+                  )}
+                </MeetingTitle>
                 {meeting.description && <div>{meeting.description}</div>}
                 <MeetingInfo>
                   Date: {format(new Date(meeting.date), 'MMM d, yyyy h:mm a')}

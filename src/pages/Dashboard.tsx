@@ -172,7 +172,7 @@ const Dashboard: React.FC = () => {
   const incompleteTasks = tasks.filter(task => !task.completed).slice(0, 5);
   const completedTasks = tasks.filter(task => task.completed).slice(0, 5);
   const upcomingMeetings = meetings
-    .filter(meeting => new Date(meeting.date) > new Date(currentDate) && !meeting.completed)
+    .filter(meeting => !meeting.completed)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
   
@@ -449,8 +449,13 @@ const Dashboard: React.FC = () => {
             {upcomingMeetings.length > 0 ? (
               upcomingMeetings.map(meeting => (
                 <ListItem key={meeting.id}>
-                  <span>{meeting.title}</span>
-                  <span>{format(new Date(meeting.date), 'MMM d, h:mm a')}</span>
+                  <span>
+                    {meeting.title}
+                    {new Date(meeting.date) < new Date(currentDate) && (
+                      <OverdueTag>OVERDUE</OverdueTag>
+                    )}
+                  </span>
+                  <span>{format(new Date(meeting.date), 'MMM d')}</span>
                 </ListItem>
               ))
             ) : (
