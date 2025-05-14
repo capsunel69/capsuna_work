@@ -5,18 +5,26 @@ import { format } from 'date-fns';
 import '98.css/dist/98.css';
 import '@react95/icons/icons.css';
 import { Computer3, BatWait, Awschd32402, Confcp118, Mspaint, Shell3213 } from '@react95/icons';
-import blissBackground from '../../assets/bliss-update.jpg';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
+import StickyNote from '../notes/StickyNote';
+import BackgroundSwitcher, { getBackgroundById } from './BackgroundSwitcher';
 
-const AppContainer = styled.div`
+const LayoutContainer = styled.div`
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+`;
+
+const AppContainer = styled.div<{ backgroundImage: string }>`
   height: 100vh;
   width: 100%;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: url(${blissBackground});
+  background-image: url(${props => props.backgroundImage});
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -41,14 +49,6 @@ const TitleBar = styled.div`
   justify-content: space-between;
   font-size: 1.1rem;
   padding: 6px 10px;
-`;
-
-const WindowContent = styled.div`
-  flex: 1;
-  overflow: auto;
-  padding: 20px;
-  font-size: 1.1rem;
-  background-color: #f0f0f0;
 `;
 
 const StatusBar = styled.div`
@@ -141,11 +141,40 @@ const LogoutButton = styled.button`
   }
 `;
 
+const MainContent = styled.div`
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+`;
+
+const ContentArea = styled.div`
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  font-size: 1.1rem;
+  background-color: #f0f0f0;
+`;
+
+const StickyNoteWrapper = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+`;
+
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const { logout } = useAuth();
   const { currentDate, setCurrentDate } = useAppContext();
+  const [backgroundId, setBackgroundId] = useState('bliss');
   
   // Update current time every minute if not in test mode
   useEffect(() => {
@@ -175,84 +204,106 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   };
 
+  const handleBackgroundChange = (newBackgroundId: string) => {
+    setBackgroundId(newBackgroundId);
+    // Save the user's preference to localStorage
+    localStorage.setItem('preferredBackgroundId', newBackgroundId);
+  };
+
+  // Load user's preferred background on mount
+  useEffect(() => {
+    const savedBackgroundId = localStorage.getItem('preferredBackgroundId');
+    if (savedBackgroundId) {
+      setBackgroundId(savedBackgroundId);
+    }
+  }, []);
+
   return (
-    <AppContainer>
-      <Window className="window">
-        <TitleBar className="title-bar">
-          <div className="title-bar-text">
-            Retro Task Manager - {
-              location.pathname === '/' ? 'Dashboard' :
-              location.pathname === '/tasks' ? 'Tasks' :
-              location.pathname === '/meetings' ? 'Meetings' :
-              location.pathname === '/reminders' ? 'Reminders' :
-              location.pathname === '/journals' ? 'Journals' : ''
-            }
-          </div>
-          <div className="title-bar-controls">
-            <button aria-label="Minimize"></button>
-            <button aria-label="Maximize"></button>
-            <button aria-label="Close"></button>
-          </div>
-        </TitleBar>
+    <LayoutContainer>
+      <AppContainer backgroundImage={getBackgroundById(backgroundId)}>
+        <Window className="window">
+          <TitleBar className="title-bar">
+            <div className="title-bar-text">
+              Retro Task Manager - {
+                location.pathname === '/' ? 'Dashboard' :
+                location.pathname === '/tasks' ? 'Tasks' :
+                location.pathname === '/meetings' ? 'Meetings' :
+                location.pathname === '/reminders' ? 'Reminders' :
+                location.pathname === '/journals' ? 'Journals' : ''
+              }
+            </div>
+            <div className="title-bar-controls">
+              <button aria-label="Minimize"></button>
+              <button aria-label="Maximize"></button>
+              <button aria-label="Close"></button>
+            </div>
+          </TitleBar>
 
-        <NavBar>
-          <Link to="/">
-            <NavButton className={location.pathname === '/' ? 'active' : ''}>
-              <Computer3 />
-              Dashboard
-            </NavButton>
-          </Link>
-          <Link to="/tasks">
-            <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>
-              <BatWait />
-              Tasks
-            </NavButton>
-          </Link>
-          <Link to="/meetings">
-            <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>
-              <Awschd32402 />
-              Meetings
-            </NavButton>
-          </Link>
-          <Link to="/reminders">
-            <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
-              <Confcp118 />
-              Reminders
-            </NavButton>
-          </Link>
-          <Link to="/journals">
-            <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
-              <Mspaint />
-              Journals
-            </NavButton>
-          </Link>
-          <LogoutButton onClick={handleLogout}>
-            <Shell3213 />
-            Logout
-          </LogoutButton>
-        </NavBar>
+          <NavBar>
+            <Link to="/">
+              <NavButton className={location.pathname === '/' ? 'active' : ''}>
+                <Computer3 />
+                Dashboard
+              </NavButton>
+            </Link>
+            <Link to="/tasks">
+              <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>
+                <BatWait />
+                Tasks
+              </NavButton>
+            </Link>
+            <Link to="/meetings">
+              <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>
+                <Awschd32402 />
+                Meetings
+              </NavButton>
+            </Link>
+            <Link to="/reminders">
+              <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
+                <Confcp118 />
+                Reminders
+              </NavButton>
+            </Link>
+            <Link to="/journals">
+              <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
+                <Mspaint />
+                Journals
+              </NavButton>
+            </Link>
+            <LogoutButton onClick={handleLogout}>
+              <Shell3213 />
+              Logout
+            </LogoutButton>
+          </NavBar>
 
-        <WindowContent>
-          {children}
-        </WindowContent>
+          <MainContent>
+            <ContentArea>
+              {children}
+            </ContentArea>
+          </MainContent>
 
-        <StatusBar>
-          <div>Ready</div>
-          <StatusDateTime>
-            <StatusDate onDoubleClick={handleDateDoubleClick}>
-              {format(currentDate, 'EEE, MMM d, yyyy')}
-              <DatePicker
-                type="datetime-local"
-                className={showDatePicker ? 'visible' : ''}
-                value={format(currentDate, "yyyy-MM-dd'T'HH:mm")}
-                onChange={handleDateChange}
-              />
-            </StatusDate>
-            <StatusTime>{format(currentDate, 'h:mm a')}</StatusTime>
-          </StatusDateTime>
-        </StatusBar>
-      </Window>
-    </AppContainer>
+          <StatusBar>
+            <div>Ready</div>
+            <StatusDateTime>
+              <StatusDate onDoubleClick={handleDateDoubleClick}>
+                {format(currentDate, 'EEE, MMM d, yyyy')}
+                <DatePicker
+                  type="datetime-local"
+                  className={showDatePicker ? 'visible' : ''}
+                  value={format(currentDate, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={handleDateChange}
+                />
+              </StatusDate>
+              <StatusTime>{format(currentDate, 'h:mm a')}</StatusTime>
+            </StatusDateTime>
+          </StatusBar>
+        </Window>
+      </AppContainer>
+      <StickyNoteWrapper>
+        <StickyNote />
+      </StickyNoteWrapper>
+      <BackgroundSwitcher onBackgroundChange={handleBackgroundChange} />
+    </LayoutContainer>
   );
 };
 
