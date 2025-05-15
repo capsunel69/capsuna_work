@@ -170,7 +170,14 @@ const Dashboard: React.FC = () => {
   
   // Get incomplete tasks, upcoming meetings, and active reminders
   const incompleteTasks = tasks.filter(task => !task.completed).slice(0, 5);
-  const completedTasks = tasks.filter(task => task.completed).slice(0, 5);
+  const completedTasks = tasks
+    .filter(task => task.completed)
+    .sort((a, b) => {
+      const dateA = a.completedAt || a.createdAt;
+      const dateB = b.completedAt || b.createdAt;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    })
+    .slice(0, 5);
   const upcomingMeetings = meetings
     .filter(meeting => !meeting.completed)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())

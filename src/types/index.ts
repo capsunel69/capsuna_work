@@ -57,4 +57,5 @@ export interface TimerSession {
   startTime: Date;
   endTime?: Date;
   duration: number; // in seconds
+  breakTime: number; // in seconds
 } 

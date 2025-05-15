@@ -35,10 +35,14 @@ interface AppContextType {
   searchJournals: (query: string) => Promise<Journal[]>;
   
   // Timer
-  startTimer: (taskId: string) => void;
+  startTimer: (taskId: string, initialTime?: number) => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
   stopTimer: (taskId: string) => void;
   activeTaskId: string | null;
   currentTimer: number; // Current timer in seconds
+  isPaused: boolean;
+  breakTime: number;
 
   // Current Date
   currentDate: Date;
@@ -88,7 +92,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Timer state
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [currentTimer, setCurrentTimer] = useState<number>(0);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [breakTime, setBreakTime] = useState<number>(0);
   const timerIntervalRef = useRef<number | null>(null);
+  const breakIntervalRef = useRef<number | null>(null);
 
   // Current date state
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -194,6 +201,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
   }, []);
+
+  // Load timer state from localStorage on mount
+  useEffect(() => {
+    const savedTimer = localStorage.getItem('timerState');
+    if (savedTimer) {
+      const timerState = JSON.parse(savedTimer);
+      setActiveTaskId(timerState.taskId);
+      setCurrentTimer(timerState.time);
+      setIsPaused(timerState.isPaused);
+      setBreakTime(timerState.breakTime || 0);
+
+      // If timer was running and not paused, restart it
+      if (timerState.taskId && !timerState.isPaused) {
+        startTimer(timerState.taskId, timerState.time);
+      }
+    }
+  }, []);
+
+  // Save timer state to localStorage whenever it changes
+  useEffect(() => {
+    if (activeTaskId || currentTimer > 0) {
+      const timerState = {
+        taskId: activeTaskId,
+        time: currentTimer,
+        isPaused,
+        breakTime
+      };
+      localStorage.setItem('timerState', JSON.stringify(timerState));
+    }
+  }, [activeTaskId, currentTimer, isPaused, breakTime]);
 
   // Task functions
   const addTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt' | 'timeSpent' | 'timers'>) => {
@@ -578,16 +615,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [reminders]);
 
   // Timer functions
-  const startTimer = useCallback((taskId: string) => {
+  const startTimer = useCallback((taskId: string, initialTime: number = 0) => {
     setActiveTaskId(taskId);
-    setCurrentTimer(0);
+    setCurrentTimer(initialTime);
+    setIsPaused(false);
     
-    // Start the timer
+    // Clear any existing intervals
     if (timerIntervalRef.current !== null) {
       window.clearInterval(timerIntervalRef.current);
     }
     
-    const startTime = Date.now();
+    const startTime = Date.now() - (initialTime * 1000);
     const timerId = window.setInterval(() => {
       const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
       setCurrentTimer(elapsedSeconds);
@@ -596,10 +634,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     timerIntervalRef.current = timerId;
   }, []);
 
-  const stopTimer = useCallback(async (taskId: string) => {
+  const pauseTimer = useCallback(() => {
     if (timerIntervalRef.current !== null) {
       window.clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
+    }
+    setIsPaused(true);
+
+    // Start break timer
+    if (breakIntervalRef.current !== null) {
+      window.clearInterval(breakIntervalRef.current);
+    }
+    
+    const breakTimerId = window.setInterval(() => {
+      setBreakTime(prev => prev + 1);
+    }, 1000);
+    
+    breakIntervalRef.current = breakTimerId;
+  }, []);
+
+  const resumeTimer = useCallback(() => {
+    if (!activeTaskId) return;
+
+    // Stop break timer
+    if (breakIntervalRef.current !== null) {
+      window.clearInterval(breakIntervalRef.current);
+      breakIntervalRef.current = null;
+    }
+
+    startTimer(activeTaskId, currentTimer);
+  }, [activeTaskId, currentTimer, startTimer]);
+
+  const stopTimer = useCallback(async (taskId: string) => {
+    // Clear all intervals
+    if (timerIntervalRef.current !== null) {
+      window.clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (breakIntervalRef.current !== null) {
+      window.clearInterval(breakIntervalRef.current);
+      breakIntervalRef.current = null;
     }
     
     const task = tasks.find(t => t.id === taskId);
@@ -609,7 +683,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: uuidv4(),
       startTime: new Date(Date.now() - currentTimer * 1000),
       endTime: new Date(),
-      duration: currentTimer
+      duration: currentTimer,
+      breakTime: breakTime
     };
     
     const updatedTimers = [...task.timers, timerSession];
@@ -626,7 +701,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setActiveTaskId(null);
     setCurrentTimer(0);
-  }, [currentTimer, tasks, updateTask]);
+    setIsPaused(false);
+    setBreakTime(0);
+    localStorage.removeItem('timerState');
+  }, [currentTimer, tasks, updateTask, breakTime]);
 
   // Convert a reminder to a task
   const convertReminderToTask = useCallback(async (reminderId: string) => {
@@ -869,6 +947,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         searchJournals,
         
         startTimer,
+        pauseTimer,
+        resumeTimer,
         stopTimer,
         activeTaskId,
         currentTimer,
@@ -879,7 +959,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLoading,
         error,
         
-        canConvertReminderToTask
+        canConvertReminderToTask,
+        isPaused,
+        breakTime
       }}
     >
       {children}
