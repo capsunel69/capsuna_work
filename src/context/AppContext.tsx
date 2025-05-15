@@ -633,7 +633,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: reminder.description,
         priority: 'medium' as const,
         completed: false,
-        dueDate: new Date(reminder.date),
+        // Use current date for the due date instead of reminder date
+        dueDate: new Date(), 
         convertedFromReminder: reminder.id
       };
       
@@ -670,7 +671,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         priority: 'medium',
         completed: false,
         createdAt: new Date(),
-        dueDate: new Date(reminder.date),
+        // Use current date for the due date instead of reminder date
+        dueDate: new Date(),
         timeSpent: 0,
         timers: [],
         convertedFromReminder: reminder.id
