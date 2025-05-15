@@ -439,6 +439,10 @@ var TaskSchema = new import_mongoose2.default.Schema({
     type: Boolean,
     default: false
   },
+  completedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

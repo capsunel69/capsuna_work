@@ -328,7 +328,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!task) return;
     
     try {
-      const updatedTask = await TasksAPI.update(taskId, { completed: !task.completed });
+      const updatedTask = await TasksAPI.update(taskId, { 
+        completed: !task.completed,
+        completedAt: !task.completed ? new Date() : undefined
+      });
       setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
       
       // If this task was converted from a reminder, update the reminder status accordingly
@@ -409,7 +412,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setError('Failed to update task');
       
       // Update local state even if API fails
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
+      setTasks(prev => prev.map(t => t.id === taskId ? { 
+        ...t, 
+        completed: !t.completed,
+        completedAt: !t.completed ? new Date() : undefined
+      } : t));
       
       // Also try to update the reminder state locally if API fails
       if (task.convertedFromReminder) {

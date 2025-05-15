@@ -187,6 +187,26 @@ const ConvertedTag = styled.span`
   font-size: 0.75rem;
 `;
 
+const FilterContainer = styled.div`
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8f8f8;
+  border: 1px solid #dfdfdf;
+  border-radius: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+`;
+
+const FilterSelect = styled(Select)`
+  width: 100%;
+`;
+
+const LoadMoreButton = styled(ActionButton)`
+  width: 100%;
+  margin: 16px 0;
+`;
+
 const Tasks: React.FC = () => {
   const { 
     tasks, 
@@ -206,6 +226,13 @@ const Tasks: React.FC = () => {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [dueDate, setDueDate] = useState('');
+  
+  // Filter state
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'overdue' | 'today' | 'upcoming'>('all');
+  
+  // Completed tasks pagination
+  const [completedTasksLimit, setCompletedTasksLimit] = useState(10);
   
   // Edit state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -256,9 +283,50 @@ const Tasks: React.FC = () => {
     setEditingTaskId(null);
   };
   
-  // Filter tasks by completion status
-  const incompleteTasks = tasks.filter(task => !task.completed);
-  const completedTasks = tasks.filter(task => task.completed);
+  // Filter tasks
+  const filterTasks = (tasks: any[]) => {
+    return tasks.filter(task => {
+      // Priority filter
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter) {
+        return false;
+      }
+
+      // Time filter
+      if (timeFilter !== 'all') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const taskDate = task.dueDate ? new Date(task.dueDate) : null;
+
+        switch (timeFilter) {
+          case 'overdue':
+            return isOverdue(task);
+          case 'today':
+            if (!taskDate) return false;
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return taskDate >= today && taskDate < tomorrow;
+          case 'upcoming':
+            if (!taskDate) return false;
+            return taskDate > new Date();
+          default:
+            return true;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  // Filter and sort tasks
+  const incompleteTasks = filterTasks(tasks.filter(task => !task.completed));
+  const allCompletedTasks = tasks
+    .filter(task => task.completed)
+    .sort((a, b) => {
+      const dateA = a.completedAt || a.createdAt;
+      const dateB = b.completedAt || b.createdAt;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+  const completedTasks = allCompletedTasks.slice(0, completedTasksLimit);
   
   if (isLoading) {
     return <LoadingState message="Loading tasks..." />;
@@ -326,6 +394,36 @@ const Tasks: React.FC = () => {
         </form>
       </FormContainer>
       
+      <FilterContainer>
+        <div>
+          <Label htmlFor="priorityFilter">Filter by Priority:</Label>
+          <FilterSelect
+            id="priorityFilter"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as 'all' | 'low' | 'medium' | 'high')}
+          >
+            <option value="all">All Priorities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </FilterSelect>
+        </div>
+        
+        <div>
+          <Label htmlFor="timeFilter">Filter by Time:</Label>
+          <FilterSelect
+            id="timeFilter"
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value as 'all' | 'overdue' | 'today' | 'upcoming')}
+          >
+            <option value="all">All Time</option>
+            <option value="overdue">Overdue</option>
+            <option value="today">Due Today</option>
+            <option value="upcoming">Upcoming</option>
+          </FilterSelect>
+        </div>
+      </FilterContainer>
+      
       {/* Active tasks */}
       <TaskList>
         <TaskListHeader>
@@ -333,7 +431,7 @@ const Tasks: React.FC = () => {
         </TaskListHeader>
         
         {incompleteTasks.length === 0 ? (
-          <NoTasks>No active tasks. Add one above!</NoTasks>
+          <NoTasks>No active tasks matching the current filters.</NoTasks>
         ) : (
           incompleteTasks.map(task => (
             <React.Fragment key={task.id}>
@@ -407,10 +505,10 @@ const Tasks: React.FC = () => {
       </TaskList>
       
       {/* Completed tasks */}
-      {completedTasks.length > 0 && (
+      {allCompletedTasks.length > 0 && (
         <TaskList>
           <TaskListHeader>
-            <span>Completed Tasks ({completedTasks.length})</span>
+            <span>Completed Tasks ({allCompletedTasks.length})</span>
             <ToggleButton 
               onClick={() => setShowCompletedTasks(!showCompletedTasks)}
             >
@@ -418,48 +516,62 @@ const Tasks: React.FC = () => {
             </ToggleButton>
           </TaskListHeader>
           
-          {showCompletedTasks && completedTasks.map(task => (
-            <TaskItem key={task.id} completed={task.completed}>
-              <RetroCheckbox
-                completed={task.completed}
-                onClick={() => toggleTaskCompletion(task.id)}
-                aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
-              />
-              
-              <div>
-                <TaskTitle>
-                  {task.title}
-                  {task.convertedFromReminder && <ConvertedTag>FROM REMINDER</ConvertedTag>}
-                </TaskTitle>
-                {task.description && (
+          {showCompletedTasks && (
+            <>
+              {completedTasks.map(task => (
+                <TaskItem key={task.id} completed={task.completed}>
+                  <RetroCheckbox
+                    completed={task.completed}
+                    onClick={() => toggleTaskCompletion(task.id)}
+                    aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                  />
+                  
                   <div>
-                    <LinkifyText text={task.description} />
+                    <TaskTitle>
+                      {task.title}
+                      {task.convertedFromReminder && <ConvertedTag>FROM REMINDER</ConvertedTag>}
+                    </TaskTitle>
+                    {task.description && (
+                      <div>
+                        <LinkifyText text={task.description} />
+                      </div>
+                    )}
+                    <TaskInfo>
+                      Priority: {task.priority}
+                      {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
+                      {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
+                    </TaskInfo>
                   </div>
-                )}
-                <TaskInfo>
-                  Priority: {task.priority}
-                  {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
-                  {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
-                </TaskInfo>
-              </div>
+                  
+                  <TaskActions>
+                    {/* Do not show Edit button for tasks linked to reminders */}
+                    {!task.convertedFromReminder && !task.completed && (
+                      <ActionButton 
+                        onClick={() => setEditingTaskId(task.id)}
+                      >
+                        Edit
+                      </ActionButton>
+                    )}
+                    <DeleteButton 
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      Delete
+                    </DeleteButton>
+                  </TaskActions>
+                </TaskItem>
+              ))}
               
-              <TaskActions>
-                {/* Do not show Edit button for tasks linked to reminders */}
-                {!task.convertedFromReminder && !task.completed && (
-                  <ActionButton 
-                    onClick={() => setEditingTaskId(task.id)}
+              {completedTasksLimit < allCompletedTasks.length && (
+                <div style={{ padding: '16px' }}>
+                  <LoadMoreButton
+                    onClick={() => setCompletedTasksLimit(prev => prev + 10)}
                   >
-                    Edit
-                  </ActionButton>
-                )}
-                <DeleteButton 
-                  onClick={() => deleteTask(task.id)}
-                >
-                  Delete
-                </DeleteButton>
-              </TaskActions>
-            </TaskItem>
-          ))}
+                    Load More Completed Tasks
+                  </LoadMoreButton>
+                </div>
+              )}
+            </>
+          )}
         </TaskList>
       )}
     </div>
