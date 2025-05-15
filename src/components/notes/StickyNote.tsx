@@ -7,7 +7,7 @@ import Draggable from 'react-draggable';
 const StickyNoteContainer = styled.div<{ width: number; height: number }>`
   position: relative;
   width: ${props => props.width}px;
-  min-width: 250px;
+  min-width: 300px;
   height: ${props => props.height}px;
   min-height: 200px;
   background: #ffd700;
@@ -193,7 +193,7 @@ const StickyNote: React.FC = () => {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [size, setSize] = useState<Size>({ width: 320, height: 320 });
+  const [size, setSize] = useState<Size>({ width: 500, height: 600 });
   const [isResizing, setIsResizing] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -208,7 +208,7 @@ const StickyNote: React.FC = () => {
   // Set default position - only once on component mount
   useEffect(() => {
     if (!initialized) {
-      const x = Math.max(window.innerWidth - 400, document.body.clientWidth - 400);
+      const x = Math.max(window.innerWidth - 600, document.body.clientWidth - 600);
       setPosition({ x, y: 100 });
       setInitialized(true);
     }

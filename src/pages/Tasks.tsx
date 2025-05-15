@@ -41,6 +41,37 @@ const TaskListHeader = styled.div`
   align-items: center;
 `;
 
+const RetroCheckbox = styled.button<{ completed: boolean }>`
+  width: 24px;
+  height: 24px;
+  border: 2px solid #888;
+  background: linear-gradient(to bottom, #f0f0f0, #e1e1e1);
+  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: 8px;
+  
+  &:before {
+    content: '${props => props.completed ? '✗' : '✓'}';
+    color: ${props => props.completed ? '#e53e3e' : '#2f855a'};
+    font-size: 18px;
+    font-weight: bold;
+  }
+  
+  &:hover {
+    background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+  }
+  
+  &:active {
+    background: #e1e1e1;
+    box-shadow: inset -1px -1px 0px 1px #ffffff, inset 1px 1px 0px 1px #888888;
+  }
+`;
+
 const TaskItem = styled.div<{ completed: boolean }>`
   padding: 12px 16px;
   border-bottom: 1px solid #dfdfdf;
@@ -48,7 +79,7 @@ const TaskItem = styled.div<{ completed: boolean }>`
   grid-template-columns: auto 1fr auto auto;
   gap: 12px;
   align-items: center;
-  ${({ completed }) => completed && 'text-decoration: line-through; color: #888;'}
+  ${({ completed }) => completed && 'color: #888;'}
   
   &:last-child {
     border-bottom: none;
@@ -154,25 +185,6 @@ const ConvertedTag = styled.span`
   color: white;
   border-radius: 3px;
   font-size: 0.75rem;
-`;
-
-
-const CompleteButton = styled.button<{ completed: boolean }>`
-  font-size: 0.9rem;
-  padding: 6px 12px;
-  background: linear-gradient(to bottom, ${props => props.completed ? '#38a169' : '#4f94ea'}, ${props => props.completed ? '#2f855a' : '#3a7bd5'});
-  color: white;
-  border-radius: 4px;
-  border: 1px solid ${props => props.completed ? '#2c7a50' : '#2c5ea9'};
-  cursor: pointer;
-  
-  &:hover {
-    background: linear-gradient(to bottom, ${props => props.completed ? '#48b179' : '#5ca0ff'}, ${props => props.completed ? '#3f9569' : '#4485e6'});
-  }
-  
-  &:active {
-    background: ${props => props.completed ? '#2f855a' : '#3a7bd5'};
-  }
 `;
 
 const Tasks: React.FC = () => {
@@ -333,10 +345,10 @@ const Tasks: React.FC = () => {
                 />
               ) : (
                 <TaskItem completed={task.completed}>
-                  <input
-                    type="checkbox"
-                    checked={task.completed}
-                    onChange={() => toggleTaskCompletion(task.id)}
+                  <RetroCheckbox
+                    completed={task.completed}
+                    onClick={() => toggleTaskCompletion(task.id)}
+                    aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
                   />
                   
                   <div>
@@ -355,15 +367,6 @@ const Tasks: React.FC = () => {
                       {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
                       {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
                     </TaskInfo>
-                  </div>
-                  
-                  <div>
-                    <CompleteButton 
-                      completed={task.completed}
-                      onClick={() => toggleTaskCompletion(task.id)}
-                    >
-                      Mark Complete
-                    </CompleteButton>
                   </div>
                   
                   <div>
@@ -417,10 +420,10 @@ const Tasks: React.FC = () => {
           
           {showCompletedTasks && completedTasks.map(task => (
             <TaskItem key={task.id} completed={task.completed}>
-              <input
-                type="checkbox"
-                checked={task.completed}
-                onChange={() => toggleTaskCompletion(task.id)}
+              <RetroCheckbox
+                completed={task.completed}
+                onClick={() => toggleTaskCompletion(task.id)}
+                aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
               />
               
               <div>
@@ -438,19 +441,6 @@ const Tasks: React.FC = () => {
                   {task.dueDate && ` • Due: ${format(new Date(task.dueDate), 'MMM d, h:mm a')}`}
                   {task.timeSpent > 0 && ` • Time spent: ${formatTime(task.timeSpent)}`}
                 </TaskInfo>
-              </div>
-              
-              <div>
-                <CompleteButton 
-                  completed={task.completed}
-                  onClick={() => toggleTaskCompletion(task.id)}
-                >
-                  Mark Incomplete
-                </CompleteButton>
-              </div>
-              
-              <div>
-                {/* No timer actions for completed tasks */}
               </div>
               
               <TaskActions>
