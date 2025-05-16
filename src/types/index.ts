@@ -45,7 +45,7 @@ export interface Reminder {
 export interface Journal {
   id: string;
   title: string;
-  content: string;
+  content: string; // HTML content
   date: Date;
   createdAt: Date;
   updatedAt?: Date;

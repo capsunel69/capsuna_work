@@ -3,6 +3,8 @@ import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
+import RichTextEditor from '../components/editor/RichTextEditor';
+import PinVerification from '../components/auth/PinVerification';
 
 // Styled components for the Journals page
 const JournalsContainer = styled.div`
@@ -73,6 +75,9 @@ const JournalEditorContainer = styled.div`
   flex: 1;
   padding: 15px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 `;
 
 const TitleInput = styled.input`
@@ -82,20 +87,6 @@ const TitleInput = styled.input`
   background-color: white;
   border: 1px solid #999;
   font-size: 1.1rem;
-`;
-
-const EditorTextArea = styled.textarea`
-  width: 100%;
-  flex: 1;
-  min-height: 400px;
-  padding: 10px;
-  margin-bottom: 15px;
-  background-color: white;
-  border: 1px solid #999;
-  resize: none;
-  font-size: 1rem;
-  line-height: 1.4;
-  font-family: inherit;
 `;
 
 const SearchBox = styled.input`
@@ -160,29 +151,35 @@ const PreviewContainer = styled.div`
     color: #0078d7;
     text-decoration: underline;
   }
-`;
 
-// Helper function to create a link renderer with sanitization
-const linkify = (text: string) => {
-  if (!text) return '';
-  
-  // URL pattern: http(s)://...
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  
-  // Replace URLs with anchor tags
-  const linkedText = text.replace(urlRegex, (url) => {
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-  });
-  
-  // Replace newlines with <br> tags
-  const htmlWithBreaks = linkedText.replace(/\n/g, '<br />');
-  
-  // Sanitize the HTML to prevent XSS attacks
-  return DOMPurify.sanitize(htmlWithBreaks, {
-    ALLOWED_TAGS: ['a', 'br'],
-    ALLOWED_ATTR: ['href', 'target', 'rel']
-  });
-};
+  p {
+    margin: 1em 0;
+  }
+
+  ul, ol {
+    padding-left: 2em;
+    margin: 1em 0;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    margin: 1em 0 0.5em;
+    line-height: 1.2;
+  }
+
+  code {
+    background-color: #f5f5f5;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+
+  blockquote {
+    border-left: 3px solid #999;
+    margin-left: 0;
+    padding-left: 1em;
+    font-style: italic;
+  }
+`;
 
 // Helper to get excerpt
 const getExcerpt = (content: string, maxLength = 100) => {
@@ -201,7 +198,9 @@ const Journals: React.FC = () => {
     addJournal, 
     updateJournal, 
     deleteJournal, 
-    searchJournals 
+    searchJournals,
+    isJournalPinVerified,
+    setJournalPinVerified
   } = useAppContext();
   
   const [selectedJournal, setSelectedJournal] = useState<string | null>(null);
@@ -212,6 +211,7 @@ const Journals: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredJournals, setFilteredJournals] = useState(journals);
   const [isEditing, setIsEditing] = useState(true);
+  const CORRECT_PIN = '42321';
   
   const tagInputRef = useRef<HTMLInputElement>(null);
 
@@ -376,6 +376,17 @@ const Journals: React.FC = () => {
     }
   };
 
+  if (!isJournalPinVerified) {
+    return (
+      <JournalsContainer>
+        <PinVerification
+          correctPin={CORRECT_PIN}
+          onSuccess={() => setJournalPinVerified(true)}
+        />
+      </JournalsContainer>
+    );
+  }
+
   return (
     <JournalsContainer>
       <JournalsSidebar>
@@ -449,7 +460,6 @@ const Journals: React.FC = () => {
             {isEditing ? (
               <JournalEditorContainer>
                 <TitleInput 
-                  type="text" 
                   placeholder="Journal Title" 
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -473,16 +483,19 @@ const Journals: React.FC = () => {
                   onKeyDown={handleTagInputKeyDown}
                 />
                 
-                <EditorTextArea 
+                <RichTextEditor
+                  content={content}
+                  onChange={setContent}
                   placeholder="Write your journal entry here..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
                 />
               </JournalEditorContainer>
             ) : (
               <PreviewContainer 
                 dangerouslySetInnerHTML={{ 
-                  __html: linkify(content) 
+                  __html: DOMPurify.sanitize(content, {
+                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'code', 'blockquote'],
+                    ALLOWED_ATTR: ['href', 'target', 'rel']
+                  })
                 }}
               />
             )}

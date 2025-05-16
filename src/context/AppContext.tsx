@@ -54,6 +54,10 @@ interface AppContextType {
 
   // New properties
   canConvertReminderToTask: (reminder: Reminder) => boolean;
+
+  // Journal PIN verification
+  isJournalPinVerified: boolean;
+  setJournalPinVerified: (verified: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -99,6 +103,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Current date state
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
+  // Journal PIN verification state
+  const [isJournalPinVerified, setJournalPinVerified] = useState(false);
 
   // Load data from API on mount
   useEffect(() => {
@@ -961,7 +968,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         canConvertReminderToTask,
         isPaused,
-        breakTime
+        breakTime,
+        
+        isJournalPinVerified,
+        setJournalPinVerified,
       }}
     >
       {children}
