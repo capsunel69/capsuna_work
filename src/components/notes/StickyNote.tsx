@@ -176,6 +176,29 @@ const ResizeHandle = styled.div`
   }
 `;
 
+const CloseButton = styled.button`
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: none;
+  border: none;
+  color: #000;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  z-index: 10;
+  
+  &:hover {
+    background-color: #ff0000;
+    color: white;
+  }
+`;
+
 interface Note {
   id: string;
   content: string;
@@ -187,7 +210,11 @@ interface Size {
   height: number;
 }
 
-const StickyNote: React.FC = () => {
+interface StickyNoteProps {
+  onClose: () => void;
+}
+
+const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
   const [note, setNote] = useState<Note | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState('');
@@ -337,7 +364,9 @@ const StickyNote: React.FC = () => {
       disabled={isResizing}
     >
       <StickyNoteContainer ref={nodeRef} width={size.width} height={size.height}>
-        <DragHandle className="drag-handle" />
+        <DragHandle className="drag-handle">
+          <CloseButton onClick={onClose}>×</CloseButton>
+        </DragHandle>
         <NoteContentWrapper>
           {isEditing ? (
             <>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { format } from 'date-fns';
 import '98.css/dist/98.css';
@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
 import StickyNote from '../notes/StickyNote';
 import BackgroundSwitcher, { getBackgroundById } from './BackgroundSwitcher';
+import DesktopIcons from './DesktopIcons';
 
 const LayoutContainer = styled.div`
   position: relative;
@@ -171,7 +172,10 @@ const StickyNoteWrapper = styled.div`
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(true);
+  const [showNotes, setShowNotes] = useState(false);
   const { logout } = useAuth();
   const { currentDate, setCurrentDate } = useAppContext();
   const [backgroundId, setBackgroundId] = useState('bliss');
@@ -218,89 +222,108 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   }, []);
 
+  const handleDashboardClick = () => {
+    setShowDashboard(!showDashboard);
+    if (!showDashboard) {
+      navigate('/');
+    }
+  };
+
+  const handleNotesClick = () => {
+    setShowNotes(!showNotes);
+  };
+
   return (
     <LayoutContainer>
       <AppContainer backgroundImage={getBackgroundById(backgroundId)}>
-        <Window className="window">
-          <TitleBar className="title-bar">
-            <div className="title-bar-text">
-              Retro Task Manager - {
-                location.pathname === '/' ? 'Dashboard' :
-                location.pathname === '/tasks' ? 'Tasks' :
-                location.pathname === '/meetings' ? 'Meetings' :
-                location.pathname === '/reminders' ? 'Reminders' :
-                location.pathname === '/journals' ? 'Journals' : ''
-              }
-            </div>
-            <div className="title-bar-controls">
-              <button aria-label="Minimize"></button>
-              <button aria-label="Maximize"></button>
-              <button aria-label="Close"></button>
-            </div>
-          </TitleBar>
+        <DesktopIcons 
+          onDashboardClick={handleDashboardClick}
+          onNotesClick={handleNotesClick}
+        />
+        {showDashboard && (
+          <Window className="window">
+            <TitleBar className="title-bar">
+              <div className="title-bar-text">
+                Retro Task Manager - {
+                  location.pathname === '/' ? 'Dashboard' :
+                  location.pathname === '/tasks' ? 'Tasks' :
+                  location.pathname === '/meetings' ? 'Meetings' :
+                  location.pathname === '/reminders' ? 'Reminders' :
+                  location.pathname === '/journals' ? 'Journals' : ''
+                }
+              </div>
+              <div className="title-bar-controls">
+                <button aria-label="Minimize"></button>
+                <button aria-label="Maximize"></button>
+                <button aria-label="Close" onClick={() => setShowDashboard(false)}></button>
+              </div>
+            </TitleBar>
 
-          <NavBar>
-            <Link to="/">
-              <NavButton className={location.pathname === '/' ? 'active' : ''}>
-                <Computer3 />
-                Dashboard
-              </NavButton>
-            </Link>
-            <Link to="/tasks">
-              <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>
-                <BatWait />
-                Tasks
-              </NavButton>
-            </Link>
-            <Link to="/meetings">
-              <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>
-                <Awschd32402 />
-                Meetings
-              </NavButton>
-            </Link>
-            <Link to="/reminders">
-              <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
-                <Confcp118 />
-                Reminders
-              </NavButton>
-            </Link>
-            <Link to="/journals">
-              <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
-                <Mspaint />
-                Journals
-              </NavButton>
-            </Link>
-            <LogoutButton onClick={handleLogout}>
-              <Shell3213 />
-              Logout
-            </LogoutButton>
-          </NavBar>
+            <NavBar>
+              <Link to="/">
+                <NavButton className={location.pathname === '/' ? 'active' : ''}>
+                  <Computer3 />
+                  Dashboard
+                </NavButton>
+              </Link>
+              <Link to="/tasks">
+                <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>
+                  <BatWait />
+                  Tasks
+                </NavButton>
+              </Link>
+              <Link to="/meetings">
+                <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>
+                  <Awschd32402 />
+                  Meetings
+                </NavButton>
+              </Link>
+              <Link to="/reminders">
+                <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
+                  <Confcp118 />
+                  Reminders
+                </NavButton>
+              </Link>
+              <Link to="/journals">
+                <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
+                  <Mspaint />
+                  Journals
+                </NavButton>
+              </Link>
+              <LogoutButton onClick={handleLogout}>
+                <Shell3213 />
+                Logout
+              </LogoutButton>
+            </NavBar>
 
-          <MainContent>
-            <ContentArea>
-              {children}
-            </ContentArea>
-          </MainContent>
+            <MainContent>
+              <ContentArea>
+                {children}
+              </ContentArea>
+            </MainContent>
 
-          <StatusBar>
-            <div>Ready</div>
-            <StatusDateTime>
-              <StatusDate onDoubleClick={handleDateDoubleClick}>
-                {format(currentDate, 'EEE, MMM d, yyyy')}
-                <DatePicker
-                  type="datetime-local"
-                  className={showDatePicker ? 'visible' : ''}
-                  value={format(currentDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={handleDateChange}
-                />
-              </StatusDate>
-              <StatusTime>{format(currentDate, 'h:mm a')}</StatusTime>
-            </StatusDateTime>
-          </StatusBar>
-        </Window>
+            <StatusBar>
+              <div>Ready</div>
+              <StatusDateTime>
+                <StatusDate onDoubleClick={handleDateDoubleClick}>
+                  {format(currentDate, 'EEE, MMM d, yyyy')}
+                  <DatePicker
+                    type="datetime-local"
+                    className={showDatePicker ? 'visible' : ''}
+                    value={format(currentDate, "yyyy-MM-dd'T'HH:mm")}
+                    onChange={handleDateChange}
+                  />
+                </StatusDate>
+                <StatusTime>{format(currentDate, 'h:mm a')}</StatusTime>
+              </StatusDateTime>
+            </StatusBar>
+          </Window>
+        )}
       </AppContainer>
       <StickyNoteWrapper>
-        <StickyNote />
+        {showNotes && (
+          <StickyNote onClose={() => setShowNotes(false)} />
+        )}
       </StickyNoteWrapper>
       <BackgroundSwitcher onBackgroundChange={handleBackgroundChange} />
     </LayoutContainer>
