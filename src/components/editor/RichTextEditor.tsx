@@ -97,11 +97,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     extensions: [
       StarterKit,
       Link.configure({
-        openOnClick: false,
+        openOnClick: true,
         HTMLAttributes: {
           rel: 'noopener noreferrer',
           target: '_blank',
         },
+        linkOnPaste: true,
+        protocols: ['http', 'https', 'mailto', 'tel'],
       }),
       Placeholder.configure({
         placeholder,
@@ -121,9 +123,30 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }
 
   const addLink = () => {
-    const url = window.prompt('Enter URL:');
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
+    const previousUrl = editor.getAttributes('link').href;
+    const url = window.prompt('Enter URL:', previousUrl);
+    
+    // If url is null, user clicked Cancel
+    if (url === null) {
+      return;
+    }
+    
+    // If url is empty, remove the link
+    if (url === '') {
+      editor.chain().focus().unsetLink().run();
+      return;
+    }
+    
+    // Add http:// if no protocol is specified
+    const finalUrl = url.match(/^https?:\/\//) ? url : `http://${url}`;
+    editor.chain().focus().setLink({ href: finalUrl }).run();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Add link on Ctrl/Cmd + K
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      addLink();
     }
   };
 
@@ -154,8 +177,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         >
           S
         </ToolButton>
-        <ToolButton onClick={addLink} active={editor.isActive('link')}>
-          Link
+        <ToolButton 
+          onClick={() => editor.isActive('link') ? editor.chain().focus().unsetLink().run() : addLink()} 
+          active={editor.isActive('link')}
+          title="Add/Edit Link (Ctrl+K)"
+        >
+          {editor.isActive('link') ? 'Edit Link' : 'Link'}
         </ToolButton>
         <ToolButton
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -194,7 +221,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           Code
         </ToolButton>
       </Toolbar>
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} onKeyDown={handleKeyDown} />
     </EditorContainer>
   );
 };
