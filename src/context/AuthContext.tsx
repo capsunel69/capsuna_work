@@ -8,8 +8,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// The password is hardcoded as requested: "Domore1@3cxz"
-const CORRECT_PASSWORD = "Domore1@3cxz";
+const CORRECT_PASSWORD = import.meta.env.VITE_LOGIN_PASSWORD;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);

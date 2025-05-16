@@ -185,16 +185,17 @@ const EnterPrompt = styled.div<{ active: boolean }>`
 `;
 
 interface PinVerificationProps {
-  correctPin: string;
   onSuccess: () => void;
 }
 
-const PinVerification: React.FC<PinVerificationProps> = ({ correctPin, onSuccess }) => {
+const PinVerification: React.FC<PinVerificationProps> = ({ onSuccess }) => {
   const [digits, setDigits] = useState(['', '', '', '', '']);
   const [error, setError] = useState('');
   const [accessStatus, setAccessStatus] = useState<'granted' | 'denied' | null>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const correctPin = import.meta.env.VITE_USER_PIN;
 
   const handleDigitChange = (index: number, value: string) => {
     if (value.length > 1) return;
