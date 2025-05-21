@@ -211,7 +211,6 @@ const Journals: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredJournals, setFilteredJournals] = useState(journals);
   const [isEditing, setIsEditing] = useState(true);
-  const CORRECT_PIN = '42321';
   
   const tagInputRef = useRef<HTMLInputElement>(null);
 
@@ -380,7 +379,6 @@ const Journals: React.FC = () => {
     return (
       <JournalsContainer>
         <PinVerification
-          correctPin={CORRECT_PIN}
           onSuccess={() => setJournalPinVerified(true)}
         />
       </JournalsContainer>
