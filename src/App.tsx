@@ -12,6 +12,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Use React.lazy for the Journals component to work around TypeScript issues
 const Journals = React.lazy(() => import('./pages/Journals'));
+const Kcal = React.lazy(() => import('./pages/Kcal'));
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
                   <Route path="/meetings" element={<Meetings />} />
                   <Route path="/reminders" element={<Reminders />} />
                   <Route path="/journals" element={<Journals />} />
+                  <Route path="/kcal" element={<Kcal />} />
                 </Routes>
               </Suspense>
             </Layout>

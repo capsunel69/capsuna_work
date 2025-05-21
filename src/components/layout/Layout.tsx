@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { format } from 'date-fns';
 import '98.css/dist/98.css';
 import '@react95/icons/icons.css';
-import { Computer3, BatWait, Awschd32402, Confcp118, Mspaint, Shell3213 } from '@react95/icons';
+import { Computer3, BatWait, Awschd32402, Confcp118, Mspaint, Shell3213, Inetcpl1313 } from '@react95/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
 import StickyNote from '../notes/StickyNote';
@@ -125,6 +125,12 @@ const NavButton = styled.button`
     height: 16px;
     display: inline-block;
   }
+  
+  /* Ensure consistent icon sizing */
+  svg {
+    width: 32px;
+    height: 32px;
+  }
 `;
 
 const LogoutButton = styled.button`
@@ -136,6 +142,14 @@ const LogoutButton = styled.button`
   background-color: #e0e0e0;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  svg {
+    width: 32px;
+    height: 32px;
+  }
   
   &:hover {
     background-color: #d0d0d0;
@@ -179,14 +193,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { logout } = useAuth();
   const { currentDate, setCurrentDate } = useAppContext();
   const [backgroundId, setBackgroundId] = useState('bliss');
-  
+
   // Update current time every minute if not in test mode
   useEffect(() => {
     if (!showDatePicker) {
       const timer = setInterval(() => {
         setCurrentDate(new Date());
       }, 60000); // Update every minute
-      
+
       return () => clearInterval(timer);
     }
   }, [showDatePicker, setCurrentDate]);
@@ -236,7 +250,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <LayoutContainer>
       <AppContainer backgroundImage={getBackgroundById(backgroundId)}>
-        <DesktopIcons 
+        <DesktopIcons
           onDashboardClick={handleDashboardClick}
           onNotesClick={handleNotesClick}
         />
@@ -244,13 +258,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Window className="window">
             <TitleBar className="title-bar">
               <div className="title-bar-text">
-                Retro Task Manager - {
-                  location.pathname === '/' ? 'Dashboard' :
-                  location.pathname === '/tasks' ? 'Tasks' :
-                  location.pathname === '/meetings' ? 'Meetings' :
-                  location.pathname === '/reminders' ? 'Reminders' :
-                  location.pathname === '/journals' ? 'Journals' : ''
-                }
+                Retro Task Manager - {location.pathname === '/' ? 'Dashboard' : location.pathname === '/tasks' ? 'Tasks' : location.pathname === '/meetings' ? 'Meetings' : location.pathname === '/reminders' ? 'Reminders' : location.pathname === '/journals' ? 'Journals' : location.pathname === '/kcal' ? 'Health Tracker' : ''}
               </div>
               <div className="title-bar-controls">
                 <button aria-label="Minimize"></button>
@@ -260,36 +268,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </TitleBar>
 
             <NavBar>
-              <Link to="/">
-                <NavButton className={location.pathname === '/' ? 'active' : ''}>
-                  <Computer3 />
-                  Dashboard
-                </NavButton>
-              </Link>
-              <Link to="/tasks">
-                <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>
-                  <BatWait />
-                  Tasks
-                </NavButton>
-              </Link>
-              <Link to="/meetings">
-                <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>
-                  <Awschd32402 />
-                  Meetings
-                </NavButton>
-              </Link>
-              <Link to="/reminders">
-                <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>
-                  <Confcp118 />
-                  Reminders
-                </NavButton>
-              </Link>
-              <Link to="/journals">
-                <NavButton className={location.pathname === '/journals' ? 'active' : ''}>
-                  <Mspaint />
-                  Journals
-                </NavButton>
-              </Link>
+              <Link to="/">                <NavButton className={location.pathname === '/' ? 'active' : ''}>                  <Computer3 />                  Dashboard                </NavButton>              </Link>              <Link to="/tasks">                <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>                  <BatWait />                  Tasks                </NavButton>              </Link>              <Link to="/meetings">                <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>                  <Awschd32402 />                  Meetings                </NavButton>              </Link>              <Link to="/reminders">                <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>                  <Confcp118 />                  Reminders                </NavButton>              </Link>              <Link to="/journals">                <NavButton className={location.pathname === '/journals' ? 'active' : ''}>                  <Mspaint />                  Journals                </NavButton>              </Link>              <Link to="/kcal">                <NavButton className={location.pathname === '/kcal' ? 'active' : ''}>                  <Inetcpl1313 />                  Health Tracker                </NavButton>              </Link>
               <LogoutButton onClick={handleLogout}>
                 <Shell3213 />
                 Logout
