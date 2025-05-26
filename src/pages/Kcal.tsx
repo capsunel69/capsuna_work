@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import styled from 'styled-components';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -531,8 +531,9 @@ const Kcal: React.FC = () => {
       
       // Add date range filters
       if (dateRange === 'week') {
-        const start = format(startOfWeek(new Date()), 'yyyy-MM-dd');
-        const end = format(endOfWeek(new Date()), 'yyyy-MM-dd');
+        // Get last 7 days from today (including today)
+        const end = format(new Date(), 'yyyy-MM-dd');
+        const start = format(subDays(new Date(), 6), 'yyyy-MM-dd');
         url += `?startDate=${start}&endDate=${end}`;
       } else if (dateRange === 'month') {
         const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
@@ -1100,7 +1101,7 @@ const Kcal: React.FC = () => {
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDateRange(e.target.value as 'week' | 'month' | 'all')}
                   style={{ width: '200px' }}
                 >
-                  <option value="week">This Week</option>
+                  <option value="week">Last 7 Days</option>
                   <option value="month">This Month</option>
                   <option value="all">All Time</option>
                 </Select>
@@ -1158,7 +1159,7 @@ const Kcal: React.FC = () => {
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDateRange(e.target.value as 'week' | 'month' | 'all')}
                   style={{ width: '200px' }}
                 >
-                  <option value="week">This Week</option>
+                  <option value="week">Last 7 Days</option>
                   <option value="month">This Month</option>
                   <option value="all">All Time</option>
                 </Select>
