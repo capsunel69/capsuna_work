@@ -9,7 +9,7 @@ const StickyNoteContainer = styled.div<{ width: number; height: number }>`
   width: ${props => props.width}px;
   min-width: 300px;
   height: ${props => props.height}px;
-  min-height: 200px;
+  min-height: 1200px;
   background: #ffd700;
   padding: 0;
   box-shadow: 
@@ -236,7 +236,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
   useEffect(() => {
     if (!initialized) {
       const x = Math.max(window.innerWidth - 600, document.body.clientWidth - 600);
-      setPosition({ x, y: 100 });
+      setPosition({ x, y: 40 });
       setInitialized(true);
     }
   }, [initialized]);
@@ -350,6 +350,20 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
     e.stopPropagation();
   };
 
+  // Handle clicking on note content to enter edit mode
+  const handleContentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Don't enter edit mode if clicking on a link
+    const target = e.target as HTMLElement;
+    if (target.tagName.toLowerCase() === 'a') {
+      return;
+    }
+    
+    // Enter edit mode when clicking on the text content
+    setIsEditing(true);
+  };
+
   if (position === null) {
     return null; // Don't render until we have a position
   }
@@ -388,7 +402,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
                 dangerouslySetInnerHTML={{
                   __html: DOMPurify.sanitize(convertLinksToHtml(note?.content || ''))
                 }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleContentClick}
                 onMouseDown={handleContentMouseDown}
               />
               <ButtonContainer>
