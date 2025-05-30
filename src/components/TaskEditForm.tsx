@@ -18,9 +18,10 @@ interface TaskEditFormProps {
   task: Task;
   onSave: (taskId: string, updatedTask: Partial<Task>) => void;
   onCancel: () => void;
+  isLoading?: boolean;
 }
 
-const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel }) => {
+const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isLoading = false }) => {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>(task.priority);
@@ -59,6 +60,7 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel }) =
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
+            disabled={isLoading}
           />
         </FormRow>
         
@@ -69,6 +71,7 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel }) =
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
+            disabled={isLoading}
           />
         </FormRow>
         
@@ -79,6 +82,7 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel }) =
               id="edit-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
+              disabled={isLoading}
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -93,13 +97,18 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel }) =
               type="datetime-local"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              disabled={isLoading}
             />
           </FormRow>
         </FormRowHorizontal>
         
         <ButtonRow>
-          <PrimaryButton type="submit">Save Changes</PrimaryButton>
-          <SecondaryButton type="button" onClick={onCancel}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={isLoading}>
+            {isLoading ? 'Saving Changes...' : 'Save Changes'}
+          </PrimaryButton>
+          <SecondaryButton type="button" onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </SecondaryButton>
         </ButtonRow>
       </form>
     </FormContainer>

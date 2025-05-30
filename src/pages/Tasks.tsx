@@ -218,6 +218,10 @@ const Tasks: React.FC = () => {
     stopTimer, 
     activeTaskId,
     isLoading,
+    isAddingTask,
+    isDeletingTask,
+    isUpdatingTask,
+    isTogglingTask,
     error
   } = useAppContext();
   
@@ -388,8 +392,12 @@ const Tasks: React.FC = () => {
           </FormRowHorizontal>
           
           <ButtonRow>
-            <PrimaryButton type="submit">Add Task</PrimaryButton>
-            <SecondaryButton type="button" onClick={resetForm}>Reset</SecondaryButton>
+            <PrimaryButton type="submit" disabled={isAddingTask}>
+              {isAddingTask ? 'Adding Task...' : 'Add Task'}
+            </PrimaryButton>
+            <SecondaryButton type="button" onClick={resetForm} disabled={isAddingTask}>
+              Reset
+            </SecondaryButton>
           </ButtonRow>
         </form>
       </FormContainer>
@@ -438,14 +446,16 @@ const Tasks: React.FC = () => {
               {editingTaskId === task.id ? (
                 <TaskEditForm 
                   task={task} 
-                  onSave={handleEditTask} 
-                  onCancel={() => setEditingTaskId(null)} 
+                  onSave={handleEditTask}
+                  onCancel={() => setEditingTaskId(null)}
+                  isLoading={isUpdatingTask}
                 />
               ) : (
                 <TaskItem completed={task.completed}>
                   <RetroCheckbox
                     completed={task.completed}
                     onClick={() => toggleTaskCompletion(task.id)}
+                    disabled={isTogglingTask}
                     aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
                   />
                   
@@ -469,12 +479,17 @@ const Tasks: React.FC = () => {
                   
                   <div>
                     {task.id === activeTaskId ? (
-                      <ActionButton onClick={() => stopTimer(task.id)}>Stop Timer</ActionButton>
+                      <ActionButton 
+                        onClick={() => stopTimer(task.id)}
+                        disabled={isUpdatingTask || isTogglingTask}
+                      >
+                        Stop Timer
+                      </ActionButton>
                     ) : (
                       !task.completed && (
                         <ActionButton 
                           onClick={() => startTimer(task.id)}
-                          disabled={!!activeTaskId}
+                          disabled={!!activeTaskId || isUpdatingTask || isTogglingTask}
                         >
                           Start Timer
                         </ActionButton>
@@ -483,18 +498,19 @@ const Tasks: React.FC = () => {
                   </div>
                   
                   <TaskActions>
-                    {/* Do not show Edit button for tasks linked to reminders */}
                     {!task.convertedFromReminder && (
                       <ActionButton 
                         onClick={() => setEditingTaskId(task.id)}
+                        disabled={isUpdatingTask || isDeletingTask || isTogglingTask}
                       >
                         Edit
                       </ActionButton>
                     )}
                     <DeleteButton 
                       onClick={() => deleteTask(task.id)}
+                      disabled={isDeletingTask || isUpdatingTask || isTogglingTask}
                     >
-                      Delete
+                      {isDeletingTask && task.id === editingTaskId ? 'Deleting...' : 'Delete'}
                     </DeleteButton>
                   </TaskActions>
                 </TaskItem>
