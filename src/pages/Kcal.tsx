@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import styled from 'styled-components';
-import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -474,11 +474,12 @@ interface ChartData {
   labels: string[];
   datasets: {
     label: string;
-    data: number[];
+    data: (number | null)[];
     borderColor: string;
     backgroundColor: string;
     tension: number;
     yAxisID: string;
+    spanGaps?: boolean;
   }[];
 }
 
@@ -531,13 +532,14 @@ const Kcal: React.FC = () => {
       
       // Add date range filters
       if (dateRange === 'week') {
-        // Get last 7 days from today (including today)
-        const end = format(new Date(), 'yyyy-MM-dd');
-        const start = format(subDays(new Date(), 6), 'yyyy-MM-dd');
+        // Get last 7 days ending with yesterday
+        const end = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        const start = format(subDays(new Date(), 7), 'yyyy-MM-dd');
         url += `?startDate=${start}&endDate=${end}`;
       } else if (dateRange === 'month') {
-        const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-        const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+        // Get last 30 days ending with yesterday
+        const end = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        const start = format(subDays(new Date(), 30), 'yyyy-MM-dd');
         url += `?startDate=${start}&endDate=${end}`;
       }
       
@@ -688,47 +690,81 @@ const Kcal: React.FC = () => {
   
   // Prepare chart data
   const chartData = useMemo(() => {
-    // Sort entries by date (oldest to newest)
-    const sortedEntries = [...entries].sort((a, b) => {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (entries.length === 0) return { labels: [], datasets: [] };
+
+    // Create an array of the last 7 days (if week view)
+    let dates: Date[] = [];
+    if (dateRange === 'week') {
+      for (let i = 7; i > 0; i--) {
+        dates.push(subDays(new Date(), i));
+      }
+    } else if (dateRange === 'month') {
+      for (let i = 30; i > 0; i--) {
+        dates.push(subDays(new Date(), i));
+      }
+    } else {
+      // For 'all' range, use the actual entry dates
+      dates = [...entries].sort((a, b) => {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      }).map(entry => new Date(entry.date));
+    }
+
+    // Create a map of entries by date string
+    const entriesByDate = new Map(
+      entries.map(entry => [format(new Date(entry.date), 'yyyy-MM-dd'), entry])
+    );
+
+    // Create arrays for each metric, filling in nulls for missing dates
+    const labels = dates.map(date => format(date, 'MM/dd/yyyy'));
+    const caloriesEaten = dates.map(date => {
+      const entry = entriesByDate.get(format(date, 'yyyy-MM-dd'));
+      return entry ? entry.caloriesEaten : null;
     });
-    
-    // Extract dates for labels
-    const labels = sortedEntries.map(entry => format(new Date(entry.date), 'MM/dd/yyyy'));
-    
+    const weights = dates.map(date => {
+      const entry = entriesByDate.get(format(date, 'yyyy-MM-dd'));
+      return entry ? entry.weight : null;
+    });
+    const caloriesBurned = dates.map(date => {
+      const entry = entriesByDate.get(format(date, 'yyyy-MM-dd'));
+      return entry ? entry.caloriesBurned : null;
+    });
+
     // Create dataset for each metric
     const data: ChartData = {
       labels,
       datasets: [
         {
           label: 'Calories Eaten',
-          data: sortedEntries.map(entry => entry.caloriesEaten),
+          data: caloriesEaten,
           borderColor: 'rgba(255, 99, 132, 1)',
           backgroundColor: 'rgba(255, 99, 132, 0.2)',
           tension: 0.1,
           yAxisID: 'y',
+          spanGaps: true, // This will connect points across null values
         },
         {
           label: 'Weight (kg)',
-          data: sortedEntries.map(entry => entry.weight),
+          data: weights,
           borderColor: 'rgba(54, 162, 235, 1)',
           backgroundColor: 'rgba(54, 162, 235, 0.2)',
           tension: 0.1,
-          yAxisID: 'y1', // Use secondary y-axis
+          yAxisID: 'y1',
+          spanGaps: true,
         },
         {
           label: 'Calories Burned',
-          data: sortedEntries.map(entry => entry.caloriesBurned),
+          data: caloriesBurned,
           borderColor: 'rgba(75, 192, 192, 1)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           tension: 0.1,
           yAxisID: 'y',
+          spanGaps: true,
         },
       ],
     };
     
     return data;
-  }, [entries]);
+  }, [entries, dateRange]);
   
   // Chart options
   const chartOptions = {
@@ -1102,7 +1138,7 @@ const Kcal: React.FC = () => {
                   style={{ width: '200px' }}
                 >
                   <option value="week">Last 7 Days</option>
-                  <option value="month">This Month</option>
+                  <option value="month">Last 30 Days</option>
                   <option value="all">All Time</option>
                 </Select>
               </FilterContainer>
@@ -1160,7 +1196,7 @@ const Kcal: React.FC = () => {
                   style={{ width: '200px' }}
                 >
                   <option value="week">Last 7 Days</option>
-                  <option value="month">This Month</option>
+                  <option value="month">Last 30 Days</option>
                   <option value="all">All Time</option>
                 </Select>
               </FilterContainer>
