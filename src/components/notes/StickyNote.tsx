@@ -2,14 +2,30 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { v4 as uuidv4 } from 'uuid';
 import DOMPurify from 'dompurify';
-import Draggable from 'react-draggable';
+
+// Modal overlay with darkened background
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+`;
 
 const StickyNoteContainer = styled.div<{ width: number; height: number }>`
   position: relative;
   width: ${props => props.width}px;
   min-width: 300px;
+  max-width: 90vw;
   height: ${props => props.height}px;
-  min-height: 1200px;
+  min-height: 400px;
+  max-height: 80vh;
   background: #ffd700;
   padding: 0;
   box-shadow: 
@@ -19,7 +35,6 @@ const StickyNoteContainer = styled.div<{ width: number; height: number }>`
   display: flex;
   flex-direction: column;
   transform-origin: center center;
-  transform: rotate(2deg);
   resize: both;
   overflow: hidden;
   
@@ -35,7 +50,6 @@ const DragHandle = styled.div`
   height: 30px;
   background: rgba(0, 0, 0, 0.03);
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  cursor: move;
   position: relative;
 
   &:before {
@@ -219,10 +233,8 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [size, setSize] = useState<Size>({ width: 500, height: 600 });
+  const [size, setSize] = useState<Size>({ width: 600, height: 700 });
   const [isResizing, setIsResizing] = useState(false);
-  const [initialized, setInitialized] = useState(false);
   const nodeRef = useRef<HTMLDivElement>(null);
   const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
 
@@ -231,15 +243,6 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
   };
-
-  // Set default position - only once on component mount
-  useEffect(() => {
-    if (!initialized) {
-      const x = Math.max(window.innerWidth - 600, document.body.clientWidth - 600);
-      setPosition({ x, y: 40 });
-      setInitialized(true);
-    }
-  }, [initialized]);
 
   // Fetch note - only once on component mount
   const fetchNote = useCallback(async () => {
@@ -258,6 +261,27 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
   useEffect(() => {
     fetchNote();
   }, [fetchNote]);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [onClose]);
+
+  // Handle clicking on overlay to close modal
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
 
   // Handle resize start
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -309,8 +333,6 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
 
   // Save note
   const handleSave = async () => {
-    if (!position) return;
-    
     try {
       setIsSaving(true);
       const noteData = {
@@ -339,12 +361,6 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
     }
   };
 
-  // Handle drag stop - just update local state, don't save to DB
-  const handleDragStop = (_e: any, data: { x: number; y: number }) => {
-    const newPosition = { x: data.x, y: data.y };
-    setPosition(newPosition);
-  };
-
   // Prevent text selection propagation
   const handleContentMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -364,21 +380,10 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
     setIsEditing(true);
   };
 
-  if (position === null) {
-    return null; // Don't render until we have a position
-  }
-
   return (
-    <Draggable
-      position={position}
-      onStop={handleDragStop}
-      bounds="parent"
-      nodeRef={nodeRef}
-      handle=".drag-handle"
-      disabled={isResizing}
-    >
+    <ModalOverlay onClick={handleOverlayClick}>
       <StickyNoteContainer ref={nodeRef} width={size.width} height={size.height}>
-        <DragHandle className="drag-handle">
+        <DragHandle>
           <CloseButton onClick={onClose}>×</CloseButton>
         </DragHandle>
         <NoteContentWrapper>
@@ -421,7 +426,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
           onClick={(e) => e.stopPropagation()}
         />
       </StickyNoteContainer>
-    </Draggable>
+    </ModalOverlay>
   );
 };
 
