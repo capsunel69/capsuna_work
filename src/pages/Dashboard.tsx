@@ -16,7 +16,7 @@ const PageTitle = styled.h2`
 
 const DashboardContainer = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 2.5fr 1.5fr;
   gap: 20px;
 `;
 
@@ -133,10 +133,10 @@ const TaskContent = styled.div`
 `;
 
 const TaskText = styled.span`
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-right: 8px;
+  word-break: break-word;
 `;
 
 const TaskDate = styled.span`
