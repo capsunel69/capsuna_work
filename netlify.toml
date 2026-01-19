@@ -10,7 +10,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["mongoose"]
+  external_node_modules = ["mongoose", "mongodb", "mongodb-connection-string-url", "whatwg-url", "tr46", "webidl-conversions"]
 
 [[redirects]]
   from = "/api/*"
