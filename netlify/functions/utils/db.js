@@ -1,7 +1,4 @@
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 let cachedDb = null;
 
@@ -10,16 +7,26 @@ async function connectToDatabase() {
     return cachedDb;
   }
 
+  // Get MongoDB URI from environment
+  const mongoUri = process.env.REACT_APP_MONGODB_URI;
+  
+  // Validate URI exists
+  if (!mongoUri) {
+    const error = new Error(
+      'REACT_APP_MONGODB_URI environment variable is not set. ' +
+      'Please configure it in your Netlify dashboard under Site settings > Environment variables.'
+    );
+    console.error(error.message);
+    throw error;
+  }
+
   // Connection options
   const options = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     dbName: 'capsuna_work' // Explicitly set the database name
   };
 
   try {
     console.log('Connecting to MongoDB...');
-    const mongoUri = process.env.REACT_APP_MONGODB_URI;
     console.log('MongoDB URI:', mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')); // Log without password
     
     const conn = await mongoose.connect(mongoUri, options);
