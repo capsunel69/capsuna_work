@@ -40,10 +40,23 @@ async function connectToDatabase() {
   if (cachedDb) {
     return cachedDb;
   }
+  console.log("Available env vars:", Object.keys(process.env).filter(
+    (k) => k.includes("MONGO") || k.includes("REACT_APP")
+  ));
   const mongoUri = process.env.REACT_APP_MONGODB_URI;
-  if (!mongoUri) {
+  console.log("REACT_APP_MONGODB_URI exists:", !!mongoUri);
+  console.log("REACT_APP_MONGODB_URI type:", typeof mongoUri);
+  console.log("REACT_APP_MONGODB_URI length:", mongoUri ? mongoUri.length : 0);
+  if (!mongoUri || typeof mongoUri !== "string" || mongoUri.trim() === "") {
     const error = new Error(
-      "REACT_APP_MONGODB_URI environment variable is not set. Please configure it in your Netlify dashboard under Site settings > Environment variables."
+      `REACT_APP_MONGODB_URI environment variable is not set or is empty. Please configure it in your Netlify dashboard under Site settings > Environment variables. Current value type: ${typeof mongoUri}, truthy: ${!!mongoUri}`
+    );
+    console.error(error.message);
+    throw error;
+  }
+  if (!mongoUri.startsWith("mongodb://") && !mongoUri.startsWith("mongodb+srv://")) {
+    const error = new Error(
+      `Invalid MongoDB URI format. URI must start with 'mongodb://' or 'mongodb+srv://'. Got: ${mongoUri.substring(0, 20)}...`
     );
     console.error(error.message);
     throw error;
@@ -54,13 +67,13 @@ async function connectToDatabase() {
   };
   try {
     console.log("Connecting to MongoDB...");
-    console.log("MongoDB URI:", mongoUri.replace(/\/\/([^:]+):([^@]+)@/, "//$1:****@"));
+    console.log("MongoDB URI (masked):", mongoUri.replace(/\/\/([^:]+):([^@]+)@/, "//$1:****@"));
     const conn = await import_mongoose.default.connect(mongoUri, options);
     cachedDb = conn;
     console.log("MongoDB connected successfully to database:", conn.connection.db.databaseName);
     return cachedDb;
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    console.error("MongoDB connection error:", error.message);
     throw error;
   }
 }
