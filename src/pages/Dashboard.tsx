@@ -183,14 +183,6 @@ const ActionButton = styled.button`
   }
 `;
 
-const ActivityCard = styled(Card)`
-  grid-column: span 2;
-  
-  @media (max-width: 900px) {
-    grid-column: span 1;
-  }
-`;
-
 const ActivityContent = styled.div`
   padding: 15px;
   display: flex;
