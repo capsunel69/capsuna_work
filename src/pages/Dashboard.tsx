@@ -3,147 +3,206 @@ import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { format, isPast, isSameDay } from 'date-fns';
 import styled from 'styled-components';
-import { OverdueTag } from '../components/shared/TagStyles';
 import LoadingState from '../components/shared/LoadingState';
 import ErrorMessage from '../components/shared/ErrorMessage';
 
-const PageTitle = styled.h2`
-  font-size: 1.8rem;
-  margin-bottom: 20px;
-  font-weight: bold;
-  color: #333;
+const PageContainer = styled.div`
+  width: 100%;
 `;
 
-const DashboardContainer = styled.div`
+const PageTitle = styled.h1`
+  font-size: 18px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #003087;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:before {
+    content: '📊';
+    font-size: 20px;
+  }
+`;
+
+const DashboardGrid = styled.div`
   display: grid;
-  grid-template-columns: 2.5fr 1.5fr;
-  gap: 20px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
-const DashboardCard = styled.div`
-  border: 1px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888, 0 3px 8px rgba(0, 0, 0, 0.1);
-  padding: 18px;
-  margin-bottom: 20px;
+const Card = styled.div`
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   border-radius: 4px;
-  background-color: #fff;
+  overflow: hidden;
 `;
 
-const DashboardTitle = styled.div`
-  background: linear-gradient(90deg, #000080, #1084d0);
+const CardHeader = styled.div<{ color?: string }>`
+  background: ${props => props.color || '#0a246a'};
   color: white;
-  padding: 8px 12px;
-  margin-bottom: 18px;
-  font-weight: bold;
-  font-size: 1.1rem;
-  border-radius: 3px;
-`;
-
-const DashboardList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 230px;
-  overflow-y: auto;
-  font-size: 1.05rem;
-`;
-
-const ListItem = styled.li`
-  padding: 8px 0;
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 13px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #dfdfdf;
-  &:last-child {
-    border-bottom: none;
-  }
 `;
 
-const ReminderItem = styled.li`
-  padding: 8px 0;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  align-items: center;
-  border-bottom: 1px solid #dfdfdf;
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const ConvertButton = styled.button`
-  background: linear-gradient(to bottom, #4f94ea, #3a7bd5);
-  color: white;
-  border: 1px solid #2c5ea9;
-  border-radius: 3px;
-  padding: 4px 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  
-  &:hover {
-    background: linear-gradient(to bottom, #5ca0ff, #4485e6);
-  }
-  
-  &:active {
-    background: #3a7bd5;
-  }
-`;
-
-const TodayTag = styled.span`
-  display: inline-block;
-  padding: 2px 6px;
-  background-color: #4299e1;
-  color: white;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  margin-left: 8px;
-`;
-
-const NoItems = styled.div`
-  color: #888;
-  text-align: center;
-  padding: 20px;
-  font-size: 1.05rem;
-`;
-
-const CardContent = styled.div`
-  font-size: 1.05rem;
-  line-height: 1.6;
+const CardBody = styled.div`
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
 `;
 
 const ViewAllLink = styled(Link)`
-  float: right;
-  color: white;
-  font-size: 0.9rem;
+  color: rgba(255,255,255,0.9);
+  font-size: 12px;
+  font-weight: normal;
   text-decoration: none;
+  
   &:hover {
     text-decoration: underline;
+    color: #fff;
   }
 `;
 
-const CompletedCheckbox = styled.input.attrs({ type: 'checkbox' })`
-  margin-right: 8px;
-`;
-
-const TaskContent = styled.div`
+const ListItem = styled.div`
+  padding: 10px 12px;
+  border-bottom: 1px solid #e8e8e8;
   display: flex;
   align-items: center;
-  min-width: 0;
+  gap: 10px;
+  font-size: 13px;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &:hover {
+    background: #f0f4ff;
+  }
+`;
+
+const Checkbox = styled.button<{ checked: boolean }>`
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border: 1px solid ${props => props.checked ? '#28a745' : '#888'};
+  background: ${props => props.checked ? '#28a745' : '#fff'};
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:after {
+    content: '${props => props.checked ? '✓' : ''}';
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+  }
+`;
+
+const TaskInfo = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
-const TaskText = styled.span`
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-right: 8px;
-  word-break: break-word;
+const TaskName = styled.span<{ completed?: boolean }>`
+  font-weight: 500;
+  color: ${props => props.completed ? '#888' : '#222'};
+  text-decoration: ${props => props.completed ? 'line-through' : 'none'};
 `;
 
-const TaskDate = styled.span`
-  white-space: nowrap;
+const Badge = styled.span<{ variant?: 'danger' | 'warning' | 'success' | 'info' | 'purple' }>`
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: 8px;
+  background: ${props => {
+    switch (props.variant) {
+      case 'danger': return '#dc3545';
+      case 'warning': return '#fd7e14';
+      case 'success': return '#28a745';
+      case 'info': return '#17a2b8';
+      case 'purple': return '#6f42c1';
+      default: return '#6c757d';
+    }
+  }};
+  color: white;
+`;
+
+const PriorityText = styled.span<{ priority: string }>`
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: ${props => {
+    switch (props.priority) {
+      case 'high': return '#dc3545';
+      case 'medium': return '#fd7e14';
+      case 'low': return '#28a745';
+      default: return '#666';
+    }
+  }};
+`;
+
+const MetaText = styled.span`
+  font-size: 12px;
   color: #666;
-  margin-left: auto;
-  padding-left: 8px;
+  white-space: nowrap;
+`;
+
+const EmptyState = styled.div`
+  padding: 30px 20px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+`;
+
+const ActionButton = styled.button`
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 500;
+  
+  &:hover {
+    background: #0056b3;
+  }
+`;
+
+const ActivityCard = styled(Card)`
+  grid-column: span 2;
+  
+  @media (max-width: 900px) {
+    grid-column: span 1;
+  }
+`;
+
+const ActivityContent = styled.div`
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+`;
+
+const TimerDisplay = styled.div`
+  font-size: 28px;
+  font-weight: bold;
+  color: #28a745;
+  font-variant-numeric: tabular-nums;
 `;
 
 const Dashboard: React.FC = () => {
@@ -168,8 +227,7 @@ const Dashboard: React.FC = () => {
     return <ErrorMessage message={error} />;
   }
   
-  // Get incomplete tasks, upcoming meetings, and active reminders
-  const incompleteTasks = tasks.filter(task => !task.completed).slice(0, 5);
+  const incompleteTasks = tasks.filter(task => !task.completed).slice(0, 6);
   const completedTasks = tasks
     .filter(task => task.completed)
     .sort((a, b) => {
@@ -178,30 +236,23 @@ const Dashboard: React.FC = () => {
       return new Date(dateB).getTime() - new Date(dateA).getTime();
     })
     .slice(0, 5);
+    
   const upcomingMeetings = meetings
     .filter(meeting => !meeting.completed)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
   
-  // Get today's reminders and other active reminders
   const todayReminders = reminders.filter(reminder => {
     const today = new Date(currentDate);
     today.setHours(0, 0, 0, 0);
 
-    // For non-recurring reminders
     if (!reminder.recurring) {
-      // Skip if completed or converted to task
       if (reminder.completed || reminder.convertedToTask) return false;
-      
-      // Check if the reminder is for today
       const reminderDate = new Date(reminder.date);
       reminderDate.setHours(0, 0, 0, 0);
       return reminderDate.getTime() === today.getTime();
     }
     
-    // For recurring reminders
-    
-    // First check if this reminder should appear today based on its schedule
     let shouldShowToday = false;
     
     if (reminder.recurring === 'daily') {
@@ -212,31 +263,22 @@ const Dashboard: React.FC = () => {
       if (reminder.recurringConfig.subtype === 'dayOfMonth') {
         shouldShowToday = today.getDate() === reminder.recurringConfig.dayOfMonth;
       } else {
-        // Handle relative day logic
         const weekNum = reminder.recurringConfig.weekNum!;
         const dayOfWeek = reminder.recurringConfig.dayOfWeek!;
-        
-        // Calculate the target date for this month
         let targetDate;
         
         if (weekNum === -1) {
-          // Last occurrence
           const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           let day = lastDayOfMonth.getDate();
-          
           while (new Date(today.getFullYear(), today.getMonth(), day).getDay() !== dayOfWeek) {
             day--;
           }
-          
           targetDate = new Date(today.getFullYear(), today.getMonth(), day);
         } else {
-          // Calculate first occurrence of the day in the month
           const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
           const firstDayOfWeek = firstDay.getDay();
           let dayOffset = dayOfWeek - firstDayOfWeek;
           if (dayOffset < 0) dayOffset += 7;
-          
-          // Calculate the date of the nth occurrence
           const day = 1 + dayOffset + (weekNum - 1) * 7;
           targetDate = new Date(today.getFullYear(), today.getMonth(), day);
         }
@@ -245,27 +287,17 @@ const Dashboard: React.FC = () => {
       }
     }
     
-    // If it's not scheduled for today, don't show it
     if (!shouldShowToday) return false;
     
-    // Check if it was completed today specifically
     const isCompletedToday = (reminder.completedInstances || []).some(date => {
       const completedDate = new Date(date);
       completedDate.setHours(0, 0, 0, 0);
       return completedDate.getTime() === today.getTime();
     });
     
-    // Show the reminder if it's scheduled for today and hasn't been completed today
     return !isCompletedToday;
   });
-  
-  // Other active reminders (not today and not converted to tasks)
-  const otherActiveReminders = reminders
-    .filter(reminder => !reminder.completed && !reminder.convertedToTask && 
-            !todayReminders.some(r => r.id === reminder.id))
-    .slice(0, 5);
-  
-  // Identify overdue tasks
+
   const overdueTasks = tasks.filter(task => 
     !task.completed && 
     task.dueDate && 
@@ -273,79 +305,93 @@ const Dashboard: React.FC = () => {
     new Date(task.dueDate) < new Date(currentDate)
   ).slice(0, 5);
   
-  // Format timer for display
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Handle convert reminder to task
-  const handleConvertToTask = (reminderId: string) => {
-    convertReminderToTask(reminderId);
-  };
-  
-  // Handle toggle task completion
-  const handleToggleTaskCompletion = (taskId: string) => {
-    toggleTaskCompletion(taskId);
-  };
-  
-  // Get active task
   const activeTask = tasks.find(task => task.id === activeTaskId);
   
   return (
-    <div>
+    <PageContainer>
       <PageTitle>Dashboard</PageTitle>
       
-      <DashboardContainer>
-        <DashboardCard>
-          <DashboardTitle>
-            Tasks To Do
-            <ViewAllLink to="/tasks">View All</ViewAllLink>
-          </DashboardTitle>
-          <DashboardList>
+      {activeTaskId && activeTask && (
+        <Card style={{ marginBottom: 16 }}>
+          <CardHeader color="linear-gradient(180deg, #28a745, #1e7e34)">
+            ⏱️ Active Timer
+          </CardHeader>
+          <ActivityContent>
+            <TimerDisplay>{formatTime(currentTimer)}</TimerDisplay>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{activeTask.title}</div>
+              <MetaText>Total time spent: {formatTime(activeTask.timeSpent + currentTimer)}</MetaText>
+            </div>
+          </ActivityContent>
+        </Card>
+      )}
+      
+      <DashboardGrid>
+        <Card>
+          <CardHeader>
+            📋 Tasks To Do ({incompleteTasks.length})
+            <ViewAllLink to="/tasks">View All →</ViewAllLink>
+          </CardHeader>
+          <CardBody>
             {incompleteTasks.length > 0 ? (
               incompleteTasks.map(task => (
                 <ListItem key={task.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                    <CompletedCheckbox
-                      checked={task.completed}
-                      onChange={() => handleToggleTaskCompletion(task.id)}
-                    />
-                    <span>
+                  <Checkbox
+                    checked={false}
+                    onClick={() => toggleTaskCompletion(task.id)}
+                  />
+                  <TaskInfo>
+                    <TaskName>
                       {task.title}
-                      {task.dueDate && isPast(new Date(task.dueDate)) && <OverdueTag>OVERDUE</OverdueTag>}
-                      {task.convertedFromReminder && <span style={{ 
-                        fontSize: '0.75rem', 
-                        backgroundColor: '#805ad5', 
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: '3px',
-                        marginLeft: '8px'
-                      }}>FROM REMINDER</span>}
-                    </span>
-                  </div>
-                  <span>{task.priority}</span>
+                      {task.dueDate && isPast(new Date(task.dueDate)) && (
+                        <Badge variant="danger">OVERDUE</Badge>
+                      )}
+                    </TaskName>
+                  </TaskInfo>
+                  <PriorityText priority={task.priority}>{task.priority}</PriorityText>
                 </ListItem>
               ))
             ) : (
-              <NoItems>No pending tasks</NoItems>
+              <EmptyState>🎉 All tasks completed!</EmptyState>
             )}
-          </DashboardList>
-        </DashboardCard>
+          </CardBody>
+        </Card>
+        
+        {overdueTasks.length > 0 && (
+          <Card>
+            <CardHeader color="linear-gradient(180deg, #dc3545, #c82333)">
+              ⚠️ Overdue Tasks ({overdueTasks.length})
+              <ViewAllLink to="/tasks">View All →</ViewAllLink>
+            </CardHeader>
+            <CardBody>
+              {overdueTasks.map(task => (
+                <ListItem key={task.id}>
+                  <TaskInfo>
+                    <TaskName>{task.title}</TaskName>
+                  </TaskInfo>
+                  <MetaText>Due: {format(new Date(task.dueDate!), 'MMM d')}</MetaText>
+                </ListItem>
+              ))}
+            </CardBody>
+          </Card>
+        )}
         
         {todayReminders.length > 0 && (
-          <DashboardCard>
-            <DashboardTitle style={{ background: 'linear-gradient(90deg, #147a00, #2cb11b)' }}>
-              Today's Reminders
-              <ViewAllLink to="/reminders">View All</ViewAllLink>
-            </DashboardTitle>
-            <DashboardList>
+          <Card>
+            <CardHeader color="linear-gradient(180deg, #28a745, #1e7e34)">
+              🔔 Today's Reminders ({todayReminders.length})
+              <ViewAllLink to="/reminders">View All →</ViewAllLink>
+            </CardHeader>
+            <CardBody>
               {todayReminders.map(reminder => {
-                // Check if this reminder has been converted to a task today
-                const isTaskCreatedToday = reminder.recurring
+                const isTaskCreated = reminder.recurring
                   ? (reminder.convertedToTaskDates || []).some(date => {
                       const convertedDate = new Date(date);
                       const today = new Date(currentDate);
@@ -354,160 +400,76 @@ const Dashboard: React.FC = () => {
                       return convertedDate.getTime() === today.getTime();
                     })
                   : reminder.convertedToTask;
-
-                // Find the associated task if any, but only for today
-                const associatedTask = tasks.find(t => {
-                  if (t.convertedFromReminder !== reminder.id) return false;
-                  
-                  // Check if the task was created today
-                  const taskDate = new Date(t.createdAt);
-                  const today = new Date(currentDate);
-                  taskDate.setHours(0, 0, 0, 0);
-                  today.setHours(0, 0, 0, 0);
-                  return taskDate.getTime() === today.getTime();
-                });
                 
                 return (
-                  <ReminderItem key={reminder.id}>
-                    <span>
-                      {reminder.title}
-                      <TodayTag>TODAY</TodayTag>
-                      {(isTaskCreatedToday || associatedTask) && (
-                        <span style={{ 
-                          fontSize: '0.75rem', 
-                          backgroundColor: associatedTask?.completed ? '#38a169' : '#805ad5', 
-                          color: 'white',
-                          padding: '2px 6px',
-                          borderRadius: '3px',
-                          marginLeft: '8px'
-                        }}>
-                          {associatedTask?.completed ? 'COMPLETED' : 'TASK CREATED'}
-                        </span>
-                      )}
-                    </span>
-                    {!isTaskCreatedToday && (
-                      <ConvertButton onClick={() => handleConvertToTask(reminder.id)}>
-                        Add as Task
-                      </ConvertButton>
+                  <ListItem key={reminder.id}>
+                    <TaskInfo>
+                      <TaskName>{reminder.title}</TaskName>
+                      {isTaskCreated && <Badge variant="purple">Task Created</Badge>}
+                    </TaskInfo>
+                    {!isTaskCreated && (
+                      <ActionButton onClick={() => convertReminderToTask(reminder.id)}>
+                        + Add Task
+                      </ActionButton>
                     )}
-                  </ReminderItem>
+                  </ListItem>
                 );
               })}
-            </DashboardList>
-          </DashboardCard>
+            </CardBody>
+          </Card>
         )}
         
-        {completedTasks.length > 0 && (
-          <DashboardCard>
-            <DashboardTitle style={{ background: 'linear-gradient(90deg, #38a169, #2f855a)' }}>
-              Recently Completed
-              <ViewAllLink to="/tasks">View All</ViewAllLink>
-            </DashboardTitle>
-            <DashboardList>
-              {completedTasks.map(task => (
-                <ListItem key={task.id}>
-                  <TaskContent>
-                    <CompletedCheckbox
-                      checked={task.completed}
-                      onChange={() => handleToggleTaskCompletion(task.id)}
-                    />
-                    <TaskText style={{ textDecoration: 'line-through', color: '#888' }}>
-                      {task.title}
-                      {task.convertedFromReminder && <span style={{ 
-                        fontSize: '0.75rem', 
-                        backgroundColor: '#805ad5', 
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: '3px',
-                        marginLeft: '8px'
-                      }}>FROM REMINDER</span>}
-                    </TaskText>
-                    <TaskDate>{format(new Date(task.createdAt), 'MMM d')}</TaskDate>
-                  </TaskContent>
-                </ListItem>
-              ))}
-            </DashboardList>
-          </DashboardCard>
-        )}
-        
-        {overdueTasks.length > 0 && (
-          <DashboardCard>
-            <DashboardTitle style={{ background: 'linear-gradient(90deg, #8B0000, #FF6347)' }}>
-              Overdue Tasks
-              <ViewAllLink to="/tasks">View All</ViewAllLink>
-            </DashboardTitle>
-            <DashboardList>
-              {overdueTasks.map(task => (
-                <ListItem key={task.id}>
-                  <span>{task.title}</span>
-                  <span>Due: {format(new Date(task.dueDate!), 'MMM d, h:mm a')}</span>
-                </ListItem>
-              ))}
-            </DashboardList>
-          </DashboardCard>
-        )}
-        
-        <DashboardCard>
-          <DashboardTitle>
-            Upcoming Meetings
-            <ViewAllLink to="/meetings">View All</ViewAllLink>
-          </DashboardTitle>
-          <DashboardList>
+        <Card>
+          <CardHeader>
+            📅 Upcoming Meetings
+            <ViewAllLink to="/meetings">View All →</ViewAllLink>
+          </CardHeader>
+          <CardBody>
             {upcomingMeetings.length > 0 ? (
               upcomingMeetings.map(meeting => (
                 <ListItem key={meeting.id}>
-                  <span>
-                    {meeting.title}
-                    {new Date(meeting.date) < new Date(currentDate) && (
-                      <OverdueTag>OVERDUE</OverdueTag>
-                    )}
-                  </span>
-                  <span>{format(new Date(meeting.date), 'MMM d')}</span>
+                  <TaskInfo>
+                    <TaskName>
+                      {meeting.title}
+                      {new Date(meeting.date) < new Date(currentDate) && (
+                        <Badge variant="danger">OVERDUE</Badge>
+                      )}
+                    </TaskName>
+                  </TaskInfo>
+                  <MetaText>{format(new Date(meeting.date), 'MMM d, h:mm a')}</MetaText>
                 </ListItem>
               ))
             ) : (
-              <NoItems>No upcoming meetings</NoItems>
+              <EmptyState>No upcoming meetings</EmptyState>
             )}
-          </DashboardList>
-        </DashboardCard>
+          </CardBody>
+        </Card>
         
-        <DashboardCard>
-          <DashboardTitle>
-            Active Reminders
-            <ViewAllLink to="/reminders">View All</ViewAllLink>
-          </DashboardTitle>
-          <DashboardList>
-            {otherActiveReminders.length > 0 ? (
-              otherActiveReminders.map(reminder => (
-                <ListItem key={reminder.id}>
-                  <span>{reminder.title}</span>
-                  <span>{reminder.recurring ? `${reminder.recurring}` : format(new Date(reminder.date), 'MMM d')}</span>
+        {completedTasks.length > 0 && (
+          <Card>
+            <CardHeader color="linear-gradient(180deg, #6c757d, #545b62)">
+              ✅ Recently Completed
+              <ViewAllLink to="/tasks">View All →</ViewAllLink>
+            </CardHeader>
+            <CardBody>
+              {completedTasks.map(task => (
+                <ListItem key={task.id}>
+                  <Checkbox
+                    checked={true}
+                    onClick={() => toggleTaskCompletion(task.id)}
+                  />
+                  <TaskInfo>
+                    <TaskName completed>{task.title}</TaskName>
+                  </TaskInfo>
+                  <MetaText>{format(new Date(task.completedAt || task.createdAt), 'MMM d')}</MetaText>
                 </ListItem>
-              ))
-            ) : (
-              <NoItems>No active reminders</NoItems>
-            )}
-          </DashboardList>
-        </DashboardCard>
-        
-        <DashboardCard>
-          <DashboardTitle>
-            Current Activity
-          </DashboardTitle>
-          <CardContent>
-            {activeTaskId ? (
-              <div>
-                <p><strong>Working on:</strong> {activeTask?.title}</p>
-                <p><strong>Time elapsed:</strong> {formatTime(currentTimer)}</p>
-              </div>
-            ) : (
-              <NoItems>No active timer</NoItems>
-            )}
-          </CardContent>
-        </DashboardCard>
-      </DashboardContainer>
-    </div>
+              ))}
+            </CardBody>
+          </Card>
+        )}
+      </DashboardGrid>
+    </PageContainer>
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

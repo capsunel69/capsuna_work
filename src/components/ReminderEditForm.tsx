@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import type { Reminder } from '../types';
 import {
-  FormContainer,
+  InlineFormContainer,
   FormRow,
   Label,
   Input,
@@ -108,7 +108,7 @@ const ReminderEditForm: React.FC<ReminderEditFormProps> = ({ reminder, onSave, o
   };
 
   return (
-    <FormContainer>
+    <InlineFormContainer>
       <form onSubmit={handleSubmit}>
         <FormRow>
           <Label htmlFor="edit-title">Title:</Label>
@@ -246,7 +246,7 @@ const ReminderEditForm: React.FC<ReminderEditFormProps> = ({ reminder, onSave, o
           <SecondaryButton type="button" onClick={onCancel}>Cancel</SecondaryButton>
         </ButtonRow>
       </form>
-    </FormContainer>
+    </InlineFormContainer>
   );
 };
 

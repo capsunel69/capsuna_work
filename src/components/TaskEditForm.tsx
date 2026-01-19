@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import styled from 'styled-components';
 import type { Task } from '../types';
 import {
-  FormContainer,
   FormRow,
   FormRowHorizontal,
   Label,
@@ -13,6 +13,23 @@ import {
   PrimaryButton,
   SecondaryButton
 } from './shared/FormStyles';
+
+const EditContainer = styled.div`
+  padding: 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e5e5e5;
+  border-left: 4px solid #007bff;
+`;
+
+const EditTitle = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
 
 interface TaskEditFormProps {
   task: Task;
@@ -29,7 +46,6 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isL
     task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ''
   );
 
-  // Reset form when task changes
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.description);
@@ -41,7 +57,6 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isL
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     onSave(task.id, {
       title,
       description,
@@ -51,10 +66,11 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isL
   };
 
   return (
-    <FormContainer>
+    <EditContainer>
+      <EditTitle>✏️ Edit Task</EditTitle>
       <form onSubmit={handleSubmit}>
         <FormRow>
-          <Label htmlFor="edit-title">Title:</Label>
+          <Label htmlFor="edit-title">Title</Label>
           <Input
             id="edit-title"
             value={title}
@@ -65,7 +81,7 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isL
         </FormRow>
         
         <FormRow>
-          <Label htmlFor="edit-description">Description:</Label>
+          <Label htmlFor="edit-description">Description</Label>
           <TextArea
             id="edit-description"
             value={description}
@@ -77,21 +93,21 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isL
         
         <FormRowHorizontal>
           <FormRow>
-            <Label htmlFor="edit-priority">Priority:</Label>
+            <Label htmlFor="edit-priority">Priority</Label>
             <Select
               id="edit-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
               disabled={isLoading}
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="low">🟢 Low</option>
+              <option value="medium">🟠 Medium</option>
+              <option value="high">🔴 High</option>
             </Select>
           </FormRow>
           
           <FormRow>
-            <Label htmlFor="edit-dueDate">Due Date (optional):</Label>
+            <Label htmlFor="edit-dueDate">Due Date</Label>
             <DateInput
               id="edit-dueDate"
               type="datetime-local"
@@ -104,15 +120,15 @@ const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isL
         
         <ButtonRow>
           <PrimaryButton type="submit" disabled={isLoading}>
-            {isLoading ? 'Saving Changes...' : 'Save Changes'}
+            {isLoading ? 'Saving...' : '✓ Save Changes'}
           </PrimaryButton>
           <SecondaryButton type="button" onClick={onCancel} disabled={isLoading}>
             Cancel
           </SecondaryButton>
         </ButtonRow>
       </form>
-    </FormContainer>
+    </EditContainer>
   );
 };
 
-export default TaskEditForm; 
+export default TaskEditForm;

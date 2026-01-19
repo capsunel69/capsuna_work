@@ -1,31 +1,64 @@
 import React, { useEffect, useState } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { useAppContext } from '../../context/AppContext';
 
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+`;
+
 const TimerContainer = styled.div`
-  padding: 8px;
-  background-color: #000080;
+  padding: 12px 20px;
+  background: #28a745;
   color: white;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border: 2px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #aeaeae, inset -1px -1px 0px 1px #000000;
+  gap: 20px;
+  border-radius: 4px;
+  margin-bottom: 15px;
 `;
 
-const TimerDisplay = styled.div<{ isPaused?: boolean }>`
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 24px;
+const TimerDisplay = styled.div<{ $isPaused?: boolean }>`
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 28px;
   font-weight: bold;
-  background-color: #000000;
-  color: ${props => props.isPaused ? '#ff6b6b' : '#00ff00'};
-  padding: 4px 8px;
-  border: 2px inset #888888;
+  background: rgba(0,0,0,0.3);
+  color: ${props => props.$isPaused ? '#ffc107' : '#fff'};
+  padding: 8px 20px;
+  border-radius: 4px;
+  min-width: 140px;
+  text-align: center;
+  animation: ${props => props.$isPaused ? pulse : 'none'} 1s ease-in-out infinite;
 `;
 
 const TaskInfo = styled.div`
-  margin-left: 16px;
   flex: 1;
+  min-width: 0;
+`;
+
+const TaskName = styled.div`
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const TaskMeta = styled.div`
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 2px;
+`;
+
+const BreakBadge = styled.span`
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(255,193,7,0.2);
+  color: #ffc107;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 10px;
 `;
 
 const ButtonContainer = styled.div`
@@ -33,56 +66,35 @@ const ButtonContainer = styled.div`
   gap: 8px;
 `;
 
-const ActionButton = styled.button<{ variant?: 'primary' | 'warning' | 'danger' }>`
+const ActionButton = styled.button<{ $variant?: 'resume' | 'pause' | 'stop' }>`
   background: ${props => {
-    switch (props.variant) {
-      case 'warning':
-        return 'linear-gradient(to bottom, #ffd700, #ffa500)';
-      case 'danger':
-        return 'linear-gradient(to bottom, #f96c6c, #e53e3e)';
-      default:
-        return 'linear-gradient(to bottom, #4CAF50, #45a049)';
+    switch (props.$variant) {
+      case 'pause': return 'rgba(255,255,255,0.2)';
+      case 'stop': return '#dc3545';
+      default: return '#fff';
     }
   }};
-  color: white;
-  font-size: 0.9rem;
-  padding: 6px 12px;
+  color: ${props => props.$variant === 'stop' || props.$variant === 'pause' ? '#fff' : '#1e7e34'};
+  font-size: 13px;
+  padding: 8px 16px;
   border-radius: 4px;
-  border: 1px solid ${props => props.variant === 'danger' ? '#c53030' : '#2e7d32'};
+  border: none;
   cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
   
   &:hover {
     background: ${props => {
-      switch (props.variant) {
-        case 'warning':
-          return 'linear-gradient(to bottom, #ffe44d, #ffb347)';
-        case 'danger':
-          return 'linear-gradient(to bottom, #ff8080, #f05252)';
-        default:
-          return 'linear-gradient(to bottom, #66bb6a, #4caf50)';
+      switch (props.$variant) {
+        case 'pause': return 'rgba(255,255,255,0.3)';
+        case 'stop': return '#c82333';
+        default: return '#f8f9fa';
       }
     }};
   }
-  
-  &:active {
-    background: ${props => {
-      switch (props.variant) {
-        case 'warning':
-          return '#ffa500';
-        case 'danger':
-          return '#e53e3e';
-        default:
-          return '#45a049';
-      }
-    }};
-  }
-`;
-
-const BreakTimeDisplay = styled.div`
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 14px;
-  color: #ffd700;
-  margin-top: 4px;
 `;
 
 const Timer: React.FC = () => {
@@ -100,73 +112,59 @@ const Timer: React.FC = () => {
   const [displayTime, setDisplayTime] = useState<string>("00:00:00");
   const [displayBreakTime, setDisplayBreakTime] = useState<string>("00:00:00");
   
-  // Format time for display
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Update display time whenever currentTimer changes
   useEffect(() => {
     setDisplayTime(formatTime(currentTimer));
   }, [currentTimer]);
 
-  // Update break time display
   useEffect(() => {
     setDisplayBreakTime(formatTime(breakTime));
   }, [breakTime]);
   
-  // Get active task
   const activeTask = tasks.find(task => task.id === activeTaskId);
   
-  // If no active task, don't render anything
   if (!activeTaskId || !activeTask) {
     return null;
   }
   
   return (
     <TimerContainer>
-      <TimerDisplay isPaused={isPaused}>
+      <TimerDisplay $isPaused={isPaused}>
         {displayTime}
-        {breakTime > 0 && (
-          <BreakTimeDisplay>
-            Break: {displayBreakTime}
-          </BreakTimeDisplay>
-        )}
       </TimerDisplay>
       
       <TaskInfo>
-        <div><strong>Task:</strong> {activeTask.title}</div>
+        <TaskName>
+          {isPaused ? '⏸️' : '▶️'} {activeTask.title}
+          {breakTime > 0 && <BreakBadge>☕ Break: {displayBreakTime}</BreakBadge>}
+        </TaskName>
         {activeTask.timeSpent > 0 && (
-          <div><strong>Total time spent:</strong> {formatTime(activeTask.timeSpent)}</div>
+          <TaskMeta>Total: {formatTime(activeTask.timeSpent + currentTimer)}</TaskMeta>
         )}
       </TaskInfo>
       
       <ButtonContainer>
         {isPaused ? (
           <ActionButton onClick={() => resumeTimer()}>
-            Resume Timer
+            ▶ Resume
           </ActionButton>
         ) : (
-          <ActionButton 
-            variant="warning"
-            onClick={() => pauseTimer()}
-          >
-            Pause Timer
+          <ActionButton $variant="pause" onClick={() => pauseTimer()}>
+            ⏸ Pause
           </ActionButton>
         )}
-        <ActionButton 
-          variant="danger"
-          onClick={() => stopTimer(activeTaskId)}
-        >
-          Stop Timer
+        <ActionButton $variant="stop" onClick={() => stopTimer(activeTaskId)}>
+          ⏹ Stop
         </ActionButton>
       </ButtonContainer>
     </TimerContainer>
   );
 };
 
-export default Timer; 
+export default Timer;

@@ -4,7 +4,6 @@ import styled from 'styled-components';
 import { format, isSameDay } from 'date-fns';
 import LinkifyText from '../components/shared/LinkifyText';
 import {
-  FormContainer,
   FormRow,
   FormRowHorizontal,
   Label,
@@ -17,119 +16,201 @@ import {
   SecondaryButton
 } from '../components/shared/FormStyles';
 
-const ReminderList = styled.div`
-  border: 1px solid #dfdfdf;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888, 0 3px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-  background-color: #fff;
+const PageContainer = styled.div`
+  width: 100%;
 `;
 
-const ReminderItem = styled.div<{ completed: boolean; convertedToTask?: boolean; isToday?: boolean }>`
-  padding: 12px 16px;
-  border-bottom: 1px solid #dfdfdf;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+const PageTitle = styled.h1`
+  font-size: 18px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #003087;
+  display: flex;
   align-items: center;
-  ${({ completed }) => completed && 'text-decoration: line-through; color: #888;'}
-  ${({ convertedToTask }) => convertedToTask && 'background-color: #f0f9ff;'}
-  ${({ isToday }) => isToday && 'background-color: #f0fff4;'}
+  gap: 8px;
+  
+  &:before {
+    content: '🔔';
+    font-size: 20px;
+  }
+`;
+
+const Card = styled.div`
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+`;
+
+const CardHeader = styled.div<{ color?: string }>`
+  background: ${props => props.color || '#0a246a'};
+  color: white;
+  padding: 10px 15px;
+  font-weight: 600;
+  font-size: 13px;
+`;
+
+const CardBody = styled.div`
+  padding: 0;
+`;
+
+const ReminderItem = styled.div<{ isToday?: boolean; converted?: boolean }>`
+  padding: 15px;
+  border-bottom: 1px solid #e5e5e5;
+  background: ${props => {
+    if (props.converted) return '#f0f0ff';
+    if (props.isToday) return '#f0fff4';
+    return '#fff';
+  }};
   
   &:last-child {
     border-bottom: none;
   }
+  
+  &:hover {
+    background: ${props => {
+      if (props.converted) return '#e8e8ff';
+      if (props.isToday) return '#e0ffe8';
+      return '#f0f4ff';
+    }};
+  }
 `;
 
-const NoReminders = styled.div`
-  padding: 32px;
-  text-align: center;
-  color: #888;
-  font-size: 1.1rem;
+const ReminderHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 `;
 
-const ReminderTitle = styled.div`
-  font-weight: bold;
-  font-size: 1.1rem;
+const Checkbox = styled.button<{ checked: boolean; disabled?: boolean }>`
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border: 2px solid ${props => props.checked ? '#28a745' : '#aaa'};
+  background: ${props => props.checked ? '#28a745' : '#fff'};
+  border-radius: 3px;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  opacity: ${props => props.disabled ? 0.5 : 1};
+  
+  &:after {
+    content: '${props => props.checked ? '✓' : ''}';
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+  }
 `;
 
-const ReminderInfo = styled.div`
-  font-size: 0.9rem;
+const ReminderContent = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const ReminderTitle = styled.h3`
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+`;
+
+const Badge = styled.span<{ variant?: 'today' | 'converted' | 'recurring' }>`
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: ${props => {
+    switch (props.variant) {
+      case 'today': return '#28a745';
+      case 'converted': return '#6f42c1';
+      case 'recurring': return '#17a2b8';
+      default: return '#6c757d';
+    }
+  }};
+  color: white;
+`;
+
+const ReminderDescription = styled.p`
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 8px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+`;
+
+const ReminderMeta = styled.div`
+  font-size: 12px;
   color: #666;
-  margin-top: 4px;
+  margin-top: 8px;
 `;
 
-const PageTitle = styled.h2`
-  font-size: 1.8rem;
-  margin-bottom: 20px;
-  font-weight: bold;
-  color: #333;
+const ReminderActions = styled.div`
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 `;
 
-const DeleteButton = styled.button`
-  background: linear-gradient(to bottom, #f96c6c, #e53e3e);
-  color: white;
-  font-size: 0.9rem;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #c53030;
+const Button = styled.button<{ variant?: 'primary' | 'danger' | 'secondary' }>`
+  padding: 6px 14px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
+  border: none;
+  
+  background: ${props => {
+    switch (props.variant) {
+      case 'danger': return '#dc3545';
+      case 'secondary': return '#6c757d';
+      default: return '#007bff';
+    }
+  }};
+  color: white;
   
   &:hover {
-    background: linear-gradient(to bottom, #ff8080, #f05252);
-  }
-  
-  &:active {
-    background: #e53e3e;
-  }
-`;
-
-const ConvertButton = styled.button`
-  background: linear-gradient(to bottom, #4f94ea, #3a7bd5);
-  color: white;
-  font-size: 0.9rem;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #2c5ea9;
-  cursor: pointer;
-  
-  &:hover {
-    background: linear-gradient(to bottom, #5ca0ff, #4485e6);
-  }
-  
-  &:active {
-    background: #3a7bd5;
+    background: ${props => {
+      switch (props.variant) {
+        case 'danger': return '#c82333';
+        case 'secondary': return '#5a6268';
+        default: return '#0056b3';
+      }
+    }};
   }
   
   &:disabled {
-    background: #cccccc;
-    border-color: #bbbbbb;
-    color: #888888;
+    background: #adb5bd;
     cursor: not-allowed;
   }
 `;
 
-const TagsContainer = styled.div`
-  display: flex;
-  gap: 6px;
-  margin-left: 8px;
-`;
-
-const Tag = styled.span<{ type: 'today' | 'converted' }>`
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  color: white;
-  background-color: ${props => props.type === 'today' ? '#4299e1' : '#805ad5'};
+const EmptyState = styled.div`
+  padding: 40px 20px;
+  text-align: center;
+  color: #888;
+  font-size: 14px;
 `;
 
 const ConditionalWrapper = styled.div<{ show: boolean }>`
   display: ${props => props.show ? 'block' : 'none'};
 `;
 
-const ReminderActions = styled.div`
-  display: flex;
-  gap: 8px;
+const PreviewText = styled.div`
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f0f4ff;
+  border-left: 3px solid #007bff;
+  font-size: 13px;
+  color: #555;
 `;
 
 const daysOfWeek = [
@@ -160,27 +241,19 @@ const Reminders: React.FC = () => {
     currentDate 
   } = useAppContext();
   
-  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [recurring, setRecurring] = useState<'' | 'daily' | 'weekly' | 'monthly'>('');
-  
-  // Weekly recurring options
-  const [weeklyDay, setWeeklyDay] = useState<number>(1); // Monday default
-  
-  // Monthly recurring options
+  const [weeklyDay, setWeeklyDay] = useState<number>(1);
   const [monthlyType, setMonthlyType] = useState<'dayOfMonth' | 'relativeDay'>('dayOfMonth');
   const [monthlyDay, setMonthlyDay] = useState<number>(1);
-  const [monthlyWeekNum, setMonthlyWeekNum] = useState<number>(1); // First
-  const [monthlyWeekDay, setMonthlyWeekDay] = useState<number>(1); // Monday
-  
-  // Handle showing/hiding date field based on recurring selection
+  const [monthlyWeekNum, setMonthlyWeekNum] = useState<number>(1);
+  const [monthlyWeekDay, setMonthlyWeekDay] = useState<number>(1);
   const [showDateField, setShowDateField] = useState(true);
   const [showRelativeDateFields, setShowRelativeDateFields] = useState(false);
   
-  // Update visibility of fields based on recurring selection
   useEffect(() => {
     if (recurring === '') {
       setShowDateField(true);
@@ -197,7 +270,6 @@ const Reminders: React.FC = () => {
     }
   }, [recurring]);
   
-  // Reset form
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -211,7 +283,6 @@ const Reminders: React.FC = () => {
     setMonthlyWeekDay(1);
   };
   
-  // Check if a reminder is due today
   const isReminderDueToday = (reminder: any) => {
     if (!reminder.recurring) {
       const reminderDate = new Date(reminder.date);
@@ -221,12 +292,9 @@ const Reminders: React.FC = () => {
              reminderDate.getDate() === today.getDate();
     }
     
-    // For recurring reminders, check based on the recurrence pattern
     const now = new Date(currentDate);
     
-    if (reminder.recurring === 'daily') {
-      return true; // Daily reminders are due every day
-    }
+    if (reminder.recurring === 'daily') return true;
     
     if (reminder.recurring === 'weekly' && reminder.recurringConfig) {
       return now.getDay() === reminder.recurringConfig.dayOfWeek;
@@ -236,31 +304,22 @@ const Reminders: React.FC = () => {
       if (reminder.recurringConfig.subtype === 'dayOfMonth') {
         return now.getDate() === reminder.recurringConfig.dayOfMonth;
       } else {
-        // Handle relative day logic
         const weekNum = reminder.recurringConfig.weekNum!;
         const dayOfWeek = reminder.recurringConfig.dayOfWeek!;
-        
-        // Calculate the target date for this month
         let targetDate;
         
         if (weekNum === -1) {
-          // Last occurrence
           const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
           let day = lastDayOfMonth.getDate();
-          
           while (new Date(now.getFullYear(), now.getMonth(), day).getDay() !== dayOfWeek) {
             day--;
           }
-          
           targetDate = new Date(now.getFullYear(), now.getMonth(), day);
         } else {
-          // Calculate first occurrence of the day in the month
           const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
           const firstDayOfWeek = firstDay.getDay();
           let dayOffset = dayOfWeek - firstDayOfWeek;
           if (dayOffset < 0) dayOffset += 7;
-          
-          // Calculate the date of the nth occurrence
           const day = 1 + dayOffset + (weekNum - 1) * 7;
           targetDate = new Date(now.getFullYear(), now.getMonth(), day);
         }
@@ -272,29 +331,25 @@ const Reminders: React.FC = () => {
     return false;
   };
   
-  // Generate full date string from date and time inputs
   const getDateString = () => {
-    if (date && time) {
-      return `${date}T${time}`;
-    }
+    if (date && time) return `${date}T${time}`;
     return '';
   };
   
-  // Create a relative date description for display
   const getRelativeDateString = () => {
+    if (recurring === 'daily') return '🔄 Repeats every day';
     if (recurring === 'weekly') {
-      return `Every ${daysOfWeek.find(d => d.value === weeklyDay)?.label || 'Monday'}`;
+      return `🔄 Every ${daysOfWeek.find(d => d.value === weeklyDay)?.label || 'Monday'}`;
     } else if (recurring === 'monthly' && monthlyType === 'dayOfMonth') {
-      return `Day ${monthlyDay} of every month`;
+      return `🔄 Day ${monthlyDay} of every month`;
     } else if (recurring === 'monthly' && monthlyType === 'relativeDay') {
       const weekNum = weekNumbers.find(w => w.value === monthlyWeekNum)?.label || 'First';
       const weekDay = daysOfWeek.find(d => d.value === monthlyWeekDay)?.label || 'Monday';
-      return `${weekNum} ${weekDay} of every month`;
+      return `🔄 ${weekNum} ${weekDay} of every month`;
     }
     return '';
   };
   
-  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -305,19 +360,15 @@ const Reminders: React.FC = () => {
       recurring: recurring || undefined,
     };
     
-    // Add date if provided or required
     if (recurring === '' && getDateString()) {
       reminderData.date = new Date(getDateString());
     } else if (recurring === 'daily') {
-      // For daily, we don't need a specific date
       if (time) {
-        // If time is provided, use current date with that time
         const now = new Date();
         const [hours, minutes] = time.split(':').map(Number);
         now.setHours(hours, minutes, 0, 0);
         reminderData.date = now;
       } else {
-        // No time provided, use current time
         reminderData.date = new Date();
       }
     } else if (recurring === 'weekly') {
@@ -327,7 +378,6 @@ const Reminders: React.FC = () => {
         time: time || undefined
       };
       
-      // Set a date to match the first occurrence
       const now = new Date();
       const currentDay = now.getDay();
       const daysToAdd = (weeklyDay - currentDay + 7) % 7;
@@ -349,11 +399,8 @@ const Reminders: React.FC = () => {
           time: time || undefined
         };
         
-        // Set a date to match the first occurrence
         const now = new Date();
         const nextOccurrence = new Date(now.getFullYear(), now.getMonth(), monthlyDay);
-        
-        // If the day has already passed this month, move to next month
         if (nextOccurrence < now) {
           nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
         }
@@ -365,7 +412,6 @@ const Reminders: React.FC = () => {
         
         reminderData.date = nextOccurrence;
       } else {
-        // relativeDay
         reminderData.recurringConfig = {
           type: 'monthly',
           subtype: 'relativeDay',
@@ -374,19 +420,16 @@ const Reminders: React.FC = () => {
           time: time || undefined
         };
         
-        // Calculate the first occurrence
         const now = new Date();
         let month = now.getMonth();
         let year = now.getFullYear();
         
-        // Function to calculate the nth day of week in a month
         const getNthDayOfWeekInMonth = (year: number, month: number, dayOfWeek: number, n: number) => {
           const firstDay = new Date(year, month, 1);
           const firstDayOfWeek = firstDay.getDay();
           let dayOffset = dayOfWeek - firstDayOfWeek;
           if (dayOffset < 0) dayOffset += 7;
           
-          // For last (-1), we need a different calculation
           if (n === -1) {
             const lastDay = new Date(year, month + 1, 0);
             const lastDayOfMonth = lastDay.getDate();
@@ -396,17 +439,15 @@ const Reminders: React.FC = () => {
             return new Date(year, month, lastDayOfMonth + offset);
           }
           
-          // Calculate the date of the nth occurrence
           const day = 1 + dayOffset + (n - 1) * 7;
           return new Date(year, month, day);
         };
         
         let nextOccurrence = getNthDayOfWeekInMonth(year, month, monthlyWeekDay, monthlyWeekNum);
         
-        // If the day has already passed this month, move to next month
         if (nextOccurrence < now) {
           month = (month + 1) % 12;
-          if (month === 0) year++; // Move to next year if needed
+          if (month === 0) year++;
           nextOccurrence = getNthDayOfWeekInMonth(year, month, monthlyWeekDay, monthlyWeekNum);
         }
         
@@ -423,289 +464,269 @@ const Reminders: React.FC = () => {
     resetForm();
   };
   
-  // Format the relative date for display in the reminders list
   const formatRecurringDisplay = (reminder: any) => {
     if (!reminder.recurring) return '';
     
-    if (reminder.recurring === 'daily') {
-      return '• Repeats daily';
-    }
+    if (reminder.recurring === 'daily') return 'Repeats daily';
     
     if (reminder.recurring === 'weekly' && reminder.recurringConfig) {
       const day = daysOfWeek.find(d => d.value === reminder.recurringConfig.dayOfWeek)?.label || 'Monday';
-      const timeStr = reminder.recurringConfig.time ? 
-        ` at ${reminder.recurringConfig.time}` : '';
-      return `• Repeats every ${day}${timeStr}`;
+      return `Every ${day}`;
     }
     
     if (reminder.recurring === 'monthly' && reminder.recurringConfig) {
       if (reminder.recurringConfig.subtype === 'dayOfMonth') {
-        const day = reminder.recurringConfig.dayOfMonth;
-        const timeStr = reminder.recurringConfig.time ? 
-          ` at ${reminder.recurringConfig.time}` : '';
-        return `• Repeats on day ${day} of each month${timeStr}`;
+        return `Day ${reminder.recurringConfig.dayOfMonth} monthly`;
       } else {
         const weekNum = weekNumbers.find(w => w.value === reminder.recurringConfig.weekNum)?.label || 'First';
         const weekDay = daysOfWeek.find(d => d.value === reminder.recurringConfig.dayOfWeek)?.label || 'Monday';
-        const timeStr = reminder.recurringConfig.time ? 
-          ` at ${reminder.recurringConfig.time}` : '';
-        return `• Repeats on the ${weekNum} ${weekDay} of each month${timeStr}`;
+        return `${weekNum} ${weekDay} monthly`;
       }
     }
     
-    return `• Recurring: ${reminder.recurring}`;
-  };
-  
-  // Handle converting reminder to task
-  const handleConvertToTask = (reminderId: string) => {
-    convertReminderToTask(reminderId);
+    return reminder.recurring;
   };
   
   return (
-    <div>
+    <PageContainer>
       <PageTitle>Reminders</PageTitle>
       
-      <FormContainer>
-        <form onSubmit={handleSubmit}>
-          <FormRow>
-            <Label htmlFor="title">Title:</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </FormRow>
-          
-          <FormRow>
-            <Label htmlFor="description">Description:</Label>
-            <TextArea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </FormRow>
-          
-          <FormRowHorizontal>
+      <Card>
+        <CardHeader color="linear-gradient(180deg, #495057, #343a40)">
+          ➕ Add New Reminder
+        </CardHeader>
+        <div style={{ padding: 15 }}>
+          <form onSubmit={handleSubmit}>
             <FormRow>
-              <Label htmlFor="recurring">Recurring:</Label>
-              <Select
-                id="recurring"
-                value={recurring}
-                onChange={(e) => setRecurring(e.target.value as '' | 'daily' | 'weekly' | 'monthly')}
-              >
-                <option value="">Not Recurring</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </Select>
-            </FormRow>
-            
-            <FormRow>
-              <Label htmlFor="time">Time:</Label>
+              <Label htmlFor="title">Title</Label>
               <Input
-                id="time"
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Reminder title..."
+                required
               />
-            </FormRow>
-          </FormRowHorizontal>
-          
-          {/* Conditional Date Field */}
-          <ConditionalWrapper show={showDateField}>
-            <FormRow>
-              <Label htmlFor="date">Date:</Label>
-              <DateInput
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required={recurring === ''}
-              />
-            </FormRow>
-          </ConditionalWrapper>
-          
-          {/* Weekly Recurring Options */}
-          <ConditionalWrapper show={showRelativeDateFields && recurring === 'weekly'}>
-            <FormRow>
-              <Label htmlFor="weeklyDay">Day of the Week:</Label>
-              <Select
-                id="weeklyDay"
-                value={weeklyDay}
-                onChange={(e) => setWeeklyDay(Number(e.target.value))}
-              >
-                {daysOfWeek.map(day => (
-                  <option key={day.value} value={day.value}>{day.label}</option>
-                ))}
-              </Select>
-            </FormRow>
-          </ConditionalWrapper>
-          
-          {/* Monthly Recurring Options */}
-          <ConditionalWrapper show={showRelativeDateFields && recurring === 'monthly'}>
-            <FormRow>
-              <Label htmlFor="monthlyType">Monthly Recurrence Type:</Label>
-              <Select
-                id="monthlyType"
-                value={monthlyType}
-                onChange={(e) => setMonthlyType(e.target.value as 'dayOfMonth' | 'relativeDay')}
-              >
-                <option value="dayOfMonth">Same day each month</option>
-                <option value="relativeDay">Specific week/day each month</option>
-              </Select>
             </FormRow>
             
-            {/* Day of Month option */}
-            <ConditionalWrapper show={monthlyType === 'dayOfMonth'}>
+            <FormRow>
+              <Label htmlFor="description">Description</Label>
+              <TextArea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add details..."
+                rows={2}
+              />
+            </FormRow>
+            
+            <FormRowHorizontal>
               <FormRow>
-                <Label htmlFor="monthlyDay">Day of Month:</Label>
+                <Label htmlFor="recurring">Repeat</Label>
                 <Select
-                  id="monthlyDay"
-                  value={monthlyDay}
-                  onChange={(e) => setMonthlyDay(Number(e.target.value))}
+                  id="recurring"
+                  value={recurring}
+                  onChange={(e) => setRecurring(e.target.value as '' | 'daily' | 'weekly' | 'monthly')}
                 >
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                    <option key={day} value={day}>{day}</option>
+                  <option value="">One-time</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </Select>
+              </FormRow>
+              
+              <FormRow>
+                <Label htmlFor="time">Time</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                />
+              </FormRow>
+            </FormRowHorizontal>
+            
+            <ConditionalWrapper show={showDateField}>
+              <FormRow>
+                <Label htmlFor="date">Date</Label>
+                <DateInput
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required={recurring === ''}
+                />
+              </FormRow>
+            </ConditionalWrapper>
+            
+            <ConditionalWrapper show={showRelativeDateFields && recurring === 'weekly'}>
+              <FormRow>
+                <Label htmlFor="weeklyDay">Day of Week</Label>
+                <Select
+                  id="weeklyDay"
+                  value={weeklyDay}
+                  onChange={(e) => setWeeklyDay(Number(e.target.value))}
+                >
+                  {daysOfWeek.map(day => (
+                    <option key={day.value} value={day.value}>{day.label}</option>
                   ))}
                 </Select>
               </FormRow>
             </ConditionalWrapper>
             
-            {/* Relative Day option (e.g., First Monday of the month) */}
-            <ConditionalWrapper show={monthlyType === 'relativeDay'}>
-              <FormRowHorizontal>
+            <ConditionalWrapper show={showRelativeDateFields && recurring === 'monthly'}>
+              <FormRow>
+                <Label htmlFor="monthlyType">Monthly Type</Label>
+                <Select
+                  id="monthlyType"
+                  value={monthlyType}
+                  onChange={(e) => setMonthlyType(e.target.value as 'dayOfMonth' | 'relativeDay')}
+                >
+                  <option value="dayOfMonth">Same day each month</option>
+                  <option value="relativeDay">Specific week/day</option>
+                </Select>
+              </FormRow>
+              
+              <ConditionalWrapper show={monthlyType === 'dayOfMonth'}>
                 <FormRow>
-                  <Label htmlFor="monthlyWeekNum">Week:</Label>
+                  <Label htmlFor="monthlyDay">Day of Month</Label>
                   <Select
-                    id="monthlyWeekNum"
-                    value={monthlyWeekNum}
-                    onChange={(e) => setMonthlyWeekNum(Number(e.target.value))}
+                    id="monthlyDay"
+                    value={monthlyDay}
+                    onChange={(e) => setMonthlyDay(Number(e.target.value))}
                   >
-                    {weekNumbers.map(week => (
-                      <option key={week.value} value={week.value}>{week.label}</option>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                      <option key={day} value={day}>{day}</option>
                     ))}
                   </Select>
                 </FormRow>
-                
-                <FormRow>
-                  <Label htmlFor="monthlyWeekDay">Day:</Label>
-                  <Select
-                    id="monthlyWeekDay"
-                    value={monthlyWeekDay}
-                    onChange={(e) => setMonthlyWeekDay(Number(e.target.value))}
-                  >
-                    {daysOfWeek.map(day => (
-                      <option key={day.value} value={day.value}>{day.label}</option>
-                    ))}
-                  </Select>
-                </FormRow>
-              </FormRowHorizontal>
-            </ConditionalWrapper>
-          </ConditionalWrapper>
-          
-          {/* Preview of recurrence pattern */}
-          {recurring && (
-            <div style={{ marginBottom: '16px', fontSize: '0.9rem', color: '#666' }}>
-              {getRelativeDateString()}
-            </div>
-          )}
-          
-          <ButtonRow>
-            <PrimaryButton type="submit">Add Reminder</PrimaryButton>
-            <SecondaryButton type="button" onClick={resetForm}>Reset</SecondaryButton>
-          </ButtonRow>
-        </form>
-      </FormContainer>
-      
-      <ReminderList>
-        {reminders.length === 0 ? (
-          <NoReminders>No reminders found.</NoReminders>
-        ) : (
-          reminders.map(reminder => {
-            const isDueToday = isReminderDueToday(reminder);
-            
-            // Check if reminder was completed today
-            const isCompletedToday = reminder.recurring
-              ? (reminder.completedInstances || []).some(date => {
-                  const completedDate = new Date(date);
-                  const today = new Date(currentDate);
-                  today.setHours(0, 0, 0, 0);
-                  completedDate.setHours(0, 0, 0, 0);
-                  return completedDate.getTime() === today.getTime();
-                })
-              : reminder.completed;
-            
-            // Check if task was created today for recurring reminders
-            const isTaskCreatedToday = reminder.recurring
-              ? (reminder.convertedToTaskDates || []).some(date => {
-                  const convertedDate = new Date(date);
-                  const today = new Date(currentDate);
-                  today.setHours(0, 0, 0, 0);
-                  convertedDate.setHours(0, 0, 0, 0);
-                  return convertedDate.getTime() === today.getTime();
-                })
-              : reminder.convertedToTask && isDueToday;
-            
-            return (
-              <ReminderItem 
-                key={reminder.id}
-                completed={isCompletedToday}
-                convertedToTask={isTaskCreatedToday}
-                isToday={isDueToday}
-              >
-                <input
-                  type="checkbox"
-                  checked={isCompletedToday}
-                  onChange={() => toggleReminderCompletion(reminder.id)}
-                  disabled={isTaskCreatedToday}
-                />
-                
-                <div>
-                  <ReminderTitle>
-                    {reminder.title}
-                    <TagsContainer>
-                      {isDueToday && (
-                        <Tag type="today">TODAY</Tag>
-                      )}
-                      {isTaskCreatedToday && (
-                        <Tag type="converted">TASK CREATED</Tag>
-                      )}
-                    </TagsContainer>
-                  </ReminderTitle>
-                  {reminder.description && (
-                    <div>
-                      <LinkifyText text={reminder.description} />
-                    </div>
-                  )}
-                  <ReminderInfo>
-                    {!reminder.recurring && `Due: ${format(new Date(reminder.date), 'MMM d, yyyy h:mm a')}`}
-                    {reminder.recurring && formatRecurringDisplay(reminder)}
-                  </ReminderInfo>
-                </div>
-                
-                <ReminderActions>
-                  {isDueToday && !isTaskCreatedToday && !isCompletedToday && (
-                    <ConvertButton 
-                      onClick={() => handleConvertToTask(reminder.id)}
+              </ConditionalWrapper>
+              
+              <ConditionalWrapper show={monthlyType === 'relativeDay'}>
+                <FormRowHorizontal>
+                  <FormRow>
+                    <Label htmlFor="monthlyWeekNum">Week</Label>
+                    <Select
+                      id="monthlyWeekNum"
+                      value={monthlyWeekNum}
+                      onChange={(e) => setMonthlyWeekNum(Number(e.target.value))}
                     >
-                      Add as Task
-                    </ConvertButton>
-                  )}
-                  <DeleteButton 
-                    onClick={() => deleteReminder(reminder.id)}
-                  >
-                    Delete
-                  </DeleteButton>
-                </ReminderActions>
-              </ReminderItem>
-            );
-          })
-        )}
-      </ReminderList>
-    </div>
+                      {weekNumbers.map(week => (
+                        <option key={week.value} value={week.value}>{week.label}</option>
+                      ))}
+                    </Select>
+                  </FormRow>
+                  
+                  <FormRow>
+                    <Label htmlFor="monthlyWeekDay">Day</Label>
+                    <Select
+                      id="monthlyWeekDay"
+                      value={monthlyWeekDay}
+                      onChange={(e) => setMonthlyWeekDay(Number(e.target.value))}
+                    >
+                      {daysOfWeek.map(day => (
+                        <option key={day.value} value={day.value}>{day.label}</option>
+                      ))}
+                    </Select>
+                  </FormRow>
+                </FormRowHorizontal>
+              </ConditionalWrapper>
+            </ConditionalWrapper>
+            
+            {recurring && <PreviewText>{getRelativeDateString()}</PreviewText>}
+            
+            <ButtonRow>
+              <PrimaryButton type="submit">+ Add Reminder</PrimaryButton>
+              <SecondaryButton type="button" onClick={resetForm}>Clear</SecondaryButton>
+            </ButtonRow>
+          </form>
+        </div>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          🔔 Active Reminders ({reminders.length})
+        </CardHeader>
+        <CardBody>
+          {reminders.length === 0 ? (
+            <EmptyState>No reminders set</EmptyState>
+          ) : (
+            reminders.map(reminder => {
+              const isDueToday = isReminderDueToday(reminder);
+              
+              const isCompletedToday = reminder.recurring
+                ? (reminder.completedInstances || []).some(d => {
+                    const completedDate = new Date(d);
+                    const today = new Date(currentDate);
+                    today.setHours(0, 0, 0, 0);
+                    completedDate.setHours(0, 0, 0, 0);
+                    return completedDate.getTime() === today.getTime();
+                  })
+                : reminder.completed;
+              
+              const isTaskCreatedToday = reminder.recurring
+                ? (reminder.convertedToTaskDates || []).some(d => {
+                    const convertedDate = new Date(d);
+                    const today = new Date(currentDate);
+                    today.setHours(0, 0, 0, 0);
+                    convertedDate.setHours(0, 0, 0, 0);
+                    return convertedDate.getTime() === today.getTime();
+                  })
+                : reminder.convertedToTask && isDueToday;
+              
+              return (
+                <ReminderItem 
+                  key={reminder.id}
+                  isToday={isDueToday && !isCompletedToday && !isTaskCreatedToday}
+                  converted={isTaskCreatedToday}
+                >
+                  <ReminderHeader>
+                    <Checkbox
+                      checked={isCompletedToday}
+                      onClick={() => toggleReminderCompletion(reminder.id)}
+                      disabled={isTaskCreatedToday}
+                    />
+                    <ReminderContent>
+                      <ReminderTitle>
+                        {reminder.title}
+                        {isDueToday && !isCompletedToday && !isTaskCreatedToday && (
+                          <Badge variant="today">TODAY</Badge>
+                        )}
+                        {isTaskCreatedToday && (
+                          <Badge variant="converted">TASK CREATED</Badge>
+                        )}
+                        {reminder.recurring && (
+                          <Badge variant="recurring">{reminder.recurring}</Badge>
+                        )}
+                      </ReminderTitle>
+                      {reminder.description && (
+                        <ReminderDescription>
+                          <LinkifyText text={reminder.description} />
+                        </ReminderDescription>
+                      )}
+                      <ReminderMeta>
+                        {!reminder.recurring && `📅 ${format(new Date(reminder.date), 'MMM d, yyyy h:mm a')}`}
+                        {reminder.recurring && `🔄 ${formatRecurringDisplay(reminder)}`}
+                      </ReminderMeta>
+                    </ReminderContent>
+                    <ReminderActions>
+                      {isDueToday && !isTaskCreatedToday && !isCompletedToday && (
+                        <Button onClick={() => convertReminderToTask(reminder.id)}>
+                          + Task
+                        </Button>
+                      )}
+                      <Button variant="danger" onClick={() => deleteReminder(reminder.id)}>
+                        ✕
+                      </Button>
+                    </ReminderActions>
+                  </ReminderHeader>
+                </ReminderItem>
+              );
+            })
+          )}
+        </CardBody>
+      </Card>
+    </PageContainer>
   );
 };
 
-export default Reminders; 
+export default Reminders;

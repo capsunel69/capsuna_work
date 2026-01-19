@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { format } from 'date-fns';
 import '98.css/dist/98.css';
 import '@react95/icons/icons.css';
-import { Computer3, BatWait, Awschd32402, Confcp118, Mspaint, Shell3213, Inetcpl1313 } from '@react95/icons';
+import { Computer3, BatWait, Awschd32402, Confcp118, Shell3213 } from '@react95/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
 import StickyNote from '../notes/StickyNote';
@@ -29,17 +29,16 @@ const AppContainer = styled.div<{ backgroundImage: string }>`
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  font-size: 16px;
 `;
 
 const Window = styled.div`
-  width: 100%;
-  height: 100%;
+  width: 95%;
+  height: 90%;
   max-width: 1200px;
-  max-height: 1000px;
+  max-height: 900px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+  background: #ececec;
   border-radius: 8px;
   overflow: hidden;
 `;
@@ -48,8 +47,116 @@ const TitleBar = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 1.1rem;
   padding: 6px 10px;
+  background: linear-gradient(180deg, #0a246a, #0d47a1);
+  color: white;
+`;
+
+const TitleText = styled.span`
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const WindowControls = styled.div`
+  display: flex;
+  gap: 4px;
+`;
+
+const WindowButton = styled.button`
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 3px;
+  background: rgba(255,255,255,0.1);
+  color: white;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background: rgba(255,255,255,0.2);
+  }
+`;
+
+const NavBar = styled.div`
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #f8f9fa, #e9ecef);
+  border-bottom: 1px solid #dee2e6;
+`;
+
+const NavLink = styled(Link)`
+  text-decoration: none;
+`;
+
+const NavButton = styled.button<{ $active?: boolean }>`
+  font-size: 13px;
+  padding: 8px 16px;
+  font-weight: ${props => props.$active ? '600' : '500'};
+  background: ${props => props.$active ? '#fff' : 'transparent'};
+  border: 1px solid ${props => props.$active ? '#dee2e6' : 'transparent'};
+  border-bottom: ${props => props.$active ? '1px solid #fff' : '1px solid transparent'};
+  border-radius: 4px 4px 0 0;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: ${props => props.$active ? '#0a246a' : '#495057'};
+  transition: all 0.15s;
+  
+  &:hover {
+    background: ${props => props.$active ? '#fff' : 'rgba(0,0,0,0.05)'};
+    color: #0a246a;
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+`;
+
+const LogoutButton = styled.button`
+  margin-left: auto;
+  font-size: 13px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #495057;
+  font-weight: 500;
+  
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  &:hover {
+    background: rgba(220,53,69,0.1);
+    color: #dc3545;
+    border-color: rgba(220,53,69,0.2);
+  }
+`;
+
+const MainContent = styled.div`
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+`;
+
+const ContentArea = styled.div`
+  flex: 1;
+  overflow: auto;
+  padding: 12px 15px;
+  background: #f5f5f5;
 `;
 
 const StatusBar = styled.div`
@@ -57,21 +164,47 @@ const StatusBar = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 6px 12px;
-  border-top: 1px solid #dfdfdf;
-  font-size: 1rem;
+  background: linear-gradient(180deg, #f0f0f0, #e0e0e0);
+  border-top: 1px solid #ccc;
+  font-size: 12px;
+  color: #555;
+`;
+
+const StatusLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const StatusIndicator = styled.span`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  
+  &:before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: #28a745;
+    border-radius: 50%;
+  }
 `;
 
 const StatusDateTime = styled.div`
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 15px;
 `;
 
 const StatusDate = styled.div`
-  border-right: 1px solid #ccc;
-  padding-right: 16px;
   cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
   position: relative;
+  
+  &:hover {
+    background: rgba(0,0,0,0.05);
+  }
 `;
 
 const DatePicker = styled.input`
@@ -79,11 +212,12 @@ const DatePicker = styled.input`
   bottom: 100%;
   right: 0;
   margin-bottom: 4px;
-  padding: 4px;
-  border: 1px solid #999;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
   background: white;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-size: 13px;
   display: none;
   
   &.visible {
@@ -92,82 +226,8 @@ const DatePicker = styled.input`
 `;
 
 const StatusTime = styled.div`
-`;
-
-const NavBar = styled.div`
-  margin-bottom: 20px;
-  display: flex;
-  gap: 12px;
-  padding: 10px;
-  background-color: #ececec;
-  border-bottom: 1px solid #dfdfdf;
-`;
-
-const NavButton = styled.button`
-  font-size: 1.1rem;
-  padding: 8px 15px;
-  font-weight: ${props => props.className === 'active' ? 'bold' : 'normal'};
-  background-color: ${props => props.className === 'active' ? '#d8e9f9' : '#e0e0e0'};
-  border: 1px solid #999;
-  border-radius: 4px;
-  box-shadow: ${props => props.className === 'active' ? 'inset 0 0 3px rgba(0, 0, 0, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.1)'};
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  &:hover {
-    background-color: ${props => props.className === 'active' ? '#d8e9f9' : '#d0d0d0'};
-  }
-
-  i {
-    width: 16px;
-    height: 16px;
-    display: inline-block;
-  }
-  
-  /* Ensure consistent icon sizing */
-  svg {
-    width: 32px;
-    height: 32px;
-  }
-`;
-
-const LogoutButton = styled.button`
-  margin-left: auto;
-  font-size: 1rem;
-  padding: 6px 12px;
-  border: 1px solid #999;
-  border-radius: 4px;
-  background-color: #e0e0e0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  svg {
-    width: 32px;
-    height: 32px;
-  }
-  
-  &:hover {
-    background-color: #d0d0d0;
-  }
-`;
-
-const MainContent = styled.div`
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-`;
-
-const ContentArea = styled.div`
-  flex: 1;
-  overflow: auto;
-  padding: 20px;
-  font-size: 1.1rem;
-  background-color: #f0f0f0;
+  font-weight: 600;
+  color: #333;
 `;
 
 const StickyNoteWrapper = styled.div`
@@ -194,13 +254,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentDate, setCurrentDate } = useAppContext();
   const [backgroundId, setBackgroundId] = useState('bliss');
 
-  // Update current time every minute if not in test mode
   useEffect(() => {
     if (!showDatePicker) {
       const timer = setInterval(() => {
         setCurrentDate(new Date());
-      }, 60000); // Update every minute
-
+      }, 60000);
       return () => clearInterval(timer);
     }
   }, [showDatePicker, setCurrentDate]);
@@ -224,11 +282,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const handleBackgroundChange = (newBackgroundId: string) => {
     setBackgroundId(newBackgroundId);
-    // Save the user's preference to localStorage
     localStorage.setItem('preferredBackgroundId', newBackgroundId);
   };
 
-  // Load user's preferred background on mount
   useEffect(() => {
     const savedBackgroundId = localStorage.getItem('preferredBackgroundId');
     if (savedBackgroundId) {
@@ -247,6 +303,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setShowNotes(!showNotes);
   };
 
+  const getPageTitle = () => {
+    switch (location.pathname) {
+      case '/': return 'Dashboard';
+      case '/tasks': return 'Tasks';
+      case '/meetings': return 'Meetings';
+      case '/reminders': return 'Reminders';
+      default: return 'Dashboard';
+    }
+  };
+
   return (
     <LayoutContainer>
       <AppContainer backgroundImage={getBackgroundById(backgroundId)}>
@@ -256,19 +322,42 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         />
         {showDashboard && (
           <Window className="window">
-            <TitleBar className="title-bar">
-              <div className="title-bar-text">
-                Retro Task Manager - {location.pathname === '/' ? 'Dashboard' : location.pathname === '/tasks' ? 'Tasks' : location.pathname === '/meetings' ? 'Meetings' : location.pathname === '/reminders' ? 'Reminders' : location.pathname === '/journals' ? 'Journals' : location.pathname === '/kcal' ? 'Health Tracker' : ''}
-              </div>
-              <div className="title-bar-controls">
-                <button aria-label="Minimize"></button>
-                <button aria-label="Maximize"></button>
-                <button aria-label="Close" onClick={() => setShowDashboard(false)}></button>
-              </div>
+            <TitleBar>
+              <TitleText>
+                📋 Retro Task Manager - {getPageTitle()}
+              </TitleText>
+              <WindowControls>
+                <WindowButton onClick={() => setShowDashboard(false)}>─</WindowButton>
+                <WindowButton>□</WindowButton>
+                <WindowButton onClick={() => setShowDashboard(false)}>✕</WindowButton>
+              </WindowControls>
             </TitleBar>
 
             <NavBar>
-              <Link to="/">                <NavButton className={location.pathname === '/' ? 'active' : ''}>                  <Computer3 />                  Dashboard                </NavButton>              </Link>              <Link to="/tasks">                <NavButton className={location.pathname === '/tasks' ? 'active' : ''}>                  <BatWait />                  Tasks                </NavButton>              </Link>              <Link to="/meetings">                <NavButton className={location.pathname === '/meetings' ? 'active' : ''}>                  <Awschd32402 />                  Meetings                </NavButton>              </Link>              <Link to="/reminders">                <NavButton className={location.pathname === '/reminders' ? 'active' : ''}>                  <Confcp118 />                  Reminders                </NavButton>              </Link>              <Link to="/journals">                <NavButton className={location.pathname === '/journals' ? 'active' : ''}>                  <Mspaint />                  Journals                </NavButton>              </Link>              <Link to="/kcal">                <NavButton className={location.pathname === '/kcal' ? 'active' : ''}>                  <Inetcpl1313 />                  Health Tracker                </NavButton>              </Link>
+              <NavLink to="/">
+                <NavButton $active={location.pathname === '/'}>
+                  <Computer3 />
+                  Dashboard
+                </NavButton>
+              </NavLink>
+              <NavLink to="/tasks">
+                <NavButton $active={location.pathname === '/tasks'}>
+                  <BatWait />
+                  Tasks
+                </NavButton>
+              </NavLink>
+              <NavLink to="/meetings">
+                <NavButton $active={location.pathname === '/meetings'}>
+                  <Awschd32402 />
+                  Meetings
+                </NavButton>
+              </NavLink>
+              <NavLink to="/reminders">
+                <NavButton $active={location.pathname === '/reminders'}>
+                  <Confcp118 />
+                  Reminders
+                </NavButton>
+              </NavLink>
               <LogoutButton onClick={handleLogout}>
                 <Shell3213 />
                 Logout
@@ -282,10 +371,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </MainContent>
 
             <StatusBar>
-              <div>Ready</div>
+              <StatusLeft>
+                <StatusIndicator>Ready</StatusIndicator>
+              </StatusLeft>
               <StatusDateTime>
                 <StatusDate onDoubleClick={handleDateDoubleClick}>
-                  {format(currentDate, 'EEE, MMM d, yyyy')}
+                  📅 {format(currentDate, 'EEE, MMM d, yyyy')}
                   <DatePicker
                     type="datetime-local"
                     className={showDatePicker ? 'visible' : ''}
@@ -293,7 +384,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onChange={handleDateChange}
                   />
                 </StatusDate>
-                <StatusTime>{format(currentDate, 'h:mm a')}</StatusTime>
+                <StatusTime>🕐 {format(currentDate, 'h:mm a')}</StatusTime>
               </StatusDateTime>
             </StatusBar>
           </Window>
@@ -309,4 +400,4 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-export default Layout; 
+export default Layout;
