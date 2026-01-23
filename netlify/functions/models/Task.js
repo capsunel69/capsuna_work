@@ -61,6 +61,10 @@ const TaskSchema = new mongoose.Schema({
   convertedFromReminder: {
     type: String,
     default: null
+  },
+  order: {
+    type: Number,
+    default: null
   }
 }, {
   collection: 'tasks',

@@ -10,6 +10,7 @@ export interface Task {
   timeSpent: number; // in seconds
   timers: TimerSession[];
   convertedFromReminder?: string; // ID of the reminder this task was converted from
+  order?: number; // For manual sorting/reordering
 }
 
 export interface Meeting {

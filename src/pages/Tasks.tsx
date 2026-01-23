@@ -62,12 +62,19 @@ const CardBody = styled.div`
   padding: 0;
 `;
 
-const TaskItem = styled.div<{ completed?: boolean }>`
+const TaskItem = styled.div<{ completed?: boolean; isDragging?: boolean; isDragOver?: boolean }>`
   padding: 12px 15px;
   border-bottom: 1px solid #e5e5e5;
   display: flex;
   gap: 12px;
-  background: ${props => props.completed ? '#fafafa' : '#fff'};
+  background: ${props => {
+    if (props.isDragging) return '#e3f2fd';
+    if (props.isDragOver) return '#bbdefb';
+    if (props.completed) return '#fafafa';
+    return '#fff';
+  }};
+  opacity: ${props => props.isDragging ? 0.5 : 1};
+  transition: background 0.15s, opacity 0.15s;
   
   &:last-child {
     border-bottom: none;
@@ -75,6 +82,26 @@ const TaskItem = styled.div<{ completed?: boolean }>`
   
   &:hover {
     background: ${props => props.completed ? '#f5f5f5' : '#f0f4ff'};
+  }
+`;
+
+const DragHandle = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  cursor: grab;
+  color: #aaa;
+  font-size: 16px;
+  user-select: none;
+  
+  &:hover {
+    color: #666;
+  }
+  
+  &:active {
+    cursor: grabbing;
   }
 `;
 
@@ -282,6 +309,7 @@ const Tasks: React.FC = () => {
     updateTask, 
     deleteTask, 
     toggleTaskCompletion, 
+    reorderTasks,
     startTimer, 
     stopTimer, 
     activeTaskId,
@@ -302,6 +330,10 @@ const Tasks: React.FC = () => {
   const [completedTasksLimit, setCompletedTasksLimit] = useState(10);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [showCompletedTasks, setShowCompletedTasks] = useState(true);
+  
+  // Drag and drop state
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   
   const resetForm = () => {
     setTitle('');
@@ -362,8 +394,77 @@ const Tasks: React.FC = () => {
       return true;
     });
   };
+  
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    setDraggedTaskId(taskId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  
+  const handleDragOver = (e: React.DragEvent, taskId: string) => {
+    e.preventDefault();
+    if (taskId !== draggedTaskId) {
+      setDragOverTaskId(taskId);
+    }
+  };
+  
+  const handleDragLeave = () => {
+    setDragOverTaskId(null);
+  };
+  
+  const handleDrop = (e: React.DragEvent, targetTaskId: string) => {
+    e.preventDefault();
+    
+    if (!draggedTaskId || draggedTaskId === targetTaskId) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
+    }
+    
+    // Get incomplete tasks sorted by order
+    const incompleteTasksList = tasks
+      .filter(task => !task.completed)
+      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+    
+    const draggedIndex = incompleteTasksList.findIndex(t => t.id === draggedTaskId);
+    const targetIndex = incompleteTasksList.findIndex(t => t.id === targetTaskId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
+    }
+    
+    // Reorder the tasks
+    const newTasks = [...incompleteTasksList];
+    const [draggedTask] = newTasks.splice(draggedIndex, 1);
+    newTasks.splice(targetIndex, 0, draggedTask);
+    
+    // Update order values
+    const reorderedWithOrder = newTasks.map((task, index) => ({
+      ...task,
+      order: index
+    }));
+    
+    // Combine with completed tasks
+    const completedTasksList = tasks.filter(task => task.completed);
+    reorderTasks([...reorderedWithOrder, ...completedTasksList]);
+    
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+  };
+  
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+  };
 
-  const incompleteTasks = filterTasks(tasks.filter(task => !task.completed));
+  // Sort incomplete tasks by order
+  const incompleteTasks = filterTasks(
+    tasks
+      .filter(task => !task.completed)
+      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
+  );
   const allCompletedTasks = tasks
     .filter(task => task.completed)
     .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime());
@@ -491,7 +592,20 @@ const Tasks: React.FC = () => {
                     isLoading={isUpdatingTask}
                   />
                 ) : (
-                  <TaskItem>
+                  <TaskItem
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, task.id)}
+                    onDragOver={(e) => handleDragOver(e, task.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, task.id)}
+                    onDragEnd={handleDragEnd}
+                    isDragging={draggedTaskId === task.id}
+                    isDragOver={dragOverTaskId === task.id}
+                  >
+                    <DragHandle title="Drag to reorder">
+                      ⋮⋮
+                    </DragHandle>
+                    
                     <Checkbox
                       completed={false}
                       onClick={() => toggleTaskCompletion(task.id)}

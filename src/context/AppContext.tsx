@@ -11,6 +11,7 @@ interface AppContextType {
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
   toggleTaskCompletion: (taskId: string) => void;
+  reorderTasks: (reorderedTasks: Task[]) => void;
   
   // Meetings
   meetings: Meeting[];
@@ -393,6 +394,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsTogglingTask(false);
     }
   }, [tasks, reminders]);
+
+  const reorderTasks = useCallback(async (reorderedTasks: Task[]) => {
+    // Update local state immediately for responsiveness
+    setTasks(reorderedTasks);
+    
+    // Update order field for each task and save to API
+    try {
+      const updatePromises = reorderedTasks
+        .filter(task => !task.completed)
+        .map((task, index) => 
+          TasksAPI.update(task.id, { order: index })
+        );
+      await Promise.all(updatePromises);
+    } catch (err) {
+      console.error('Error saving task order:', err);
+      // Don't revert local state - the order change still works locally
+    }
+  }, []);
 
   // Meeting functions
   const addMeeting = useCallback(async (meeting: Omit<Meeting, 'id'>) => {
@@ -826,6 +845,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateTask,
         deleteTask,
         toggleTaskCompletion,
+        reorderTasks,
         
         meetings,
         addMeeting,
