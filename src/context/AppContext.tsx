@@ -109,6 +109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [breakTime, setBreakTime] = useState<number>(0);
   const timerIntervalRef = useRef<number | null>(null);
   const breakIntervalRef = useRef<number | null>(null);
+  const timerStateRestoredRef = useRef<boolean>(false);
 
   // Current date state
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -218,11 +219,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Load timer state from localStorage on mount
+  // Load timer state from localStorage AFTER tasks are loaded
   useEffect(() => {
+    // Only restore timer state once, after tasks have been loaded
+    if (isLoading || timerStateRestoredRef.current) return;
+    
+    timerStateRestoredRef.current = true;
+    
     const savedTimer = localStorage.getItem('timerState');
     if (savedTimer) {
       const timerState = JSON.parse(savedTimer);
+      
+      // Validate that the task still exists and is not completed
+      const task = tasks.find(t => t.id === timerState.taskId);
+      if (!task || task.completed) {
+        // Task no longer exists or is completed - clear stale timer state
+        localStorage.removeItem('timerState');
+        return;
+      }
+      
       setActiveTaskId(timerState.taskId);
       setCurrentTimer(timerState.time);
       setIsPaused(timerState.isPaused);
@@ -233,7 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startTimer(timerState.taskId, timerState.time);
       }
     }
-  }, []);
+  }, [isLoading, tasks]);
 
   // Save timer state to localStorage whenever it changes
   useEffect(() => {
