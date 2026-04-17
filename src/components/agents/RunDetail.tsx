@@ -1,0 +1,190 @@
+import React, { useEffect, useState } from 'react';
+import styled from 'styled-components';
+import { Badge, Spinner, Stack } from '../ui/primitives';
+import { PiovraAPI, type AgentRun, type RunStatus } from '../../services/piovra';
+import StepCard from './StepCard';
+import Drawer from './Drawer';
+
+const Meta = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--s-3);
+  font-size: 12px;
+  color: var(--text-3);
+
+  label {
+    display: block;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-4);
+    margin-bottom: 4px;
+  }
+  div { color: var(--text-1); font-family: var(--font-mono); font-size: 12px; }
+`;
+
+const Section = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+
+  h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+    margin: 0;
+  }
+`;
+
+const Pre = styled.pre`
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  padding: var(--s-3) var(--s-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-1);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+`;
+
+const StepStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+`;
+
+const TraceLink = styled.a`
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  &:hover { text-decoration: underline; }
+`;
+
+const statusTone = (s: RunStatus): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' => {
+  switch (s) {
+    case 'queued': return 'neutral';
+    case 'running': return 'accent';
+    case 'succeeded': return 'success';
+    case 'failed': return 'danger';
+    case 'cancelled': return 'warning';
+  }
+};
+
+interface RunDetailProps {
+  runId: string | null;
+  onClose: () => void;
+}
+
+const RunDetail: React.FC<RunDetailProps> = ({ runId, onClose }) => {
+  const [run, setRun] = useState<AgentRun | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!runId) { setRun(null); return; }
+    let cancelled = false;
+    setRun(null);
+    setErr(null);
+    PiovraAPI.getRun(runId)
+      .then((r) => { if (!cancelled) setRun(r); })
+      .catch((e) => { if (!cancelled) setErr(e instanceof Error ? e.message : String(e)); });
+    return () => { cancelled = true; };
+  }, [runId]);
+
+  return (
+    <Drawer
+      open={!!runId}
+      onClose={onClose}
+      title={
+        <>
+          Run {runId?.slice(0, 8)}
+          {run ? <Badge $variant={statusTone(run.status)} style={{ marginLeft: 8 }}>{run.status}</Badge> : null}
+        </>
+      }
+    >
+      {err ? (
+        <div style={{ color: 'var(--danger)', fontSize: 12 }}>{err}</div>
+      ) : !run ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)' }}>
+          <Spinner /> Loading run…
+        </div>
+      ) : (
+        <Stack $gap={4}>
+          <Meta>
+            <div>
+              <label>Started</label>
+              <div>{new Date(run.startedAt).toLocaleString()}</div>
+            </div>
+            <div>
+              <label>Ended</label>
+              <div>{run.endedAt ? new Date(run.endedAt).toLocaleString() : '—'}</div>
+            </div>
+            <div>
+              <label>Tokens in</label>
+              <div>{run.tokensIn ?? '—'}</div>
+            </div>
+            <div>
+              <label>Tokens out</label>
+              <div>{run.tokensOut ?? '—'}</div>
+            </div>
+            <div>
+              <label>Cost (USD)</label>
+              <div>{run.costUsd ?? '—'}</div>
+            </div>
+            <div>
+              <label>Instance</label>
+              <div>{run.instanceId.slice(0, 8)}</div>
+            </div>
+          </Meta>
+
+          {run.langfuseTraceId ? (
+            <Section>
+              <h4>Langfuse trace</h4>
+              <TraceLink
+                href={`https://cloud.langfuse.com/trace/${run.langfuseTraceId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {run.langfuseTraceId}
+              </TraceLink>
+            </Section>
+          ) : null}
+
+          <Section>
+            <h4>Input</h4>
+            <Pre>{run.input}</Pre>
+          </Section>
+
+          <Section>
+            <h4>Steps</h4>
+            {run.steps.length === 0 ? (
+              <div style={{ color: 'var(--text-3)', fontSize: 12 }}>No steps recorded.</div>
+            ) : (
+              <StepStack>
+                {run.steps.map((step, i) => <StepCard key={i} step={step} />)}
+              </StepStack>
+            )}
+          </Section>
+
+          {run.output ? (
+            <Section>
+              <h4>Output</h4>
+              <Pre>{run.output}</Pre>
+            </Section>
+          ) : null}
+
+          {run.error ? (
+            <Section>
+              <h4>Error</h4>
+              <Pre style={{ color: 'var(--danger)' }}>{run.error}</Pre>
+            </Section>
+          ) : null}
+        </Stack>
+      )}
+    </Drawer>
+  );
+};
+
+export default RunDetail;

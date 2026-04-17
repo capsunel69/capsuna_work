@@ -172,3 +172,28 @@ export const IconSpark = make(
     <path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" />
   </>
 );
+
+export const IconBot = make(
+  <>
+    <rect x="4" y="7" width="16" height="12" rx="3" />
+    <path d="M12 3v4" />
+    <circle cx="9" cy="13" r="1" />
+    <circle cx="15" cy="13" r="1" />
+    <path d="M9 17h6" />
+  </>
+);
+
+export const IconSend = make(
+  <>
+    <path d="M22 2L11 13" />
+    <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+  </>
+);
+
+export const IconRefresh = make(
+  <>
+    <polyline points="23 4 23 10 17 10" />
+    <polyline points="1 20 1 14 7 14" />
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+  </>
+);

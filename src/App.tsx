@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Meetings from './pages/Meetings';
 import Reminders from './pages/Reminders';
+import Agents from './pages/Agents';
 import Timer from './components/timer/Timer';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { ToastProvider } from './components/ui/Toast';
@@ -24,6 +25,7 @@ function App() {
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/meetings" element={<Meetings />} />
                   <Route path="/reminders" element={<Reminders />} />
+                  <Route path="/agents" element={<Agents />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

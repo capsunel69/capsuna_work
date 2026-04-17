@@ -8,7 +8,7 @@ import StickyNote from '../notes/StickyNote';
 import BackgroundFx from './BackgroundFx';
 import {
   IconDashboard, IconTasks, IconCalendar, IconBell, IconNote,
-  IconLogout, IconChevronLeft, IconSpark, IconClock,
+  IconLogout, IconChevronLeft, IconSpark, IconClock, IconBot,
 } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 
@@ -24,6 +24,7 @@ const NAV_PRIMARY: NavItem[] = [
   { to: '/tasks',     label: 'Tasks',     icon: IconTasks },
   { to: '/meetings',  label: 'Meetings',  icon: IconCalendar },
   { to: '/reminders', label: 'Reminders', icon: IconBell },
+  { to: '/agents',    label: 'Agents',    icon: IconBot },
 ];
 
 /* ── Layout chrome ─────────────────────────────────────────────────────── */

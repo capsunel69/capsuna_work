@@ -21,6 +21,7 @@
     "express": "^5.1.0",
     "mongodb": "^6.16.0",
     "mongoose": "^8.14.3",
+    "netlify-cli": "^25.0.0",
     "react": "^19.1.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.1.0",
