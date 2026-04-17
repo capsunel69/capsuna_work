@@ -1,402 +1,390 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { format } from 'date-fns';
-import '98.css/dist/98.css';
-import '@react95/icons/icons.css';
-import { Computer3, BatWait, Awschd32402, Confcp118, Shell3213 } from '@react95/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
 import StickyNote from '../notes/StickyNote';
-import BackgroundSwitcher, { getBackgroundById } from './BackgroundSwitcher';
-import DesktopIcons from './DesktopIcons';
+import BackgroundFx from './BackgroundFx';
+import {
+  IconDashboard, IconTasks, IconCalendar, IconBell, IconNote,
+  IconLogout, IconChevronLeft, IconSpark, IconClock,
+} from '../ui/icons';
+import { IconButton } from '../ui/primitives';
 
-const LayoutContainer = styled.div`
-  position: relative;
+/* ── Module registry — add a new entry to expose a new section ─────────── */
+type NavItem = {
+  to: string;
+  label: string;
+  icon: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }>;
+};
+
+const NAV_PRIMARY: NavItem[] = [
+  { to: '/',          label: 'Overview',  icon: IconDashboard },
+  { to: '/tasks',     label: 'Tasks',     icon: IconTasks },
+  { to: '/meetings',  label: 'Meetings',  icon: IconCalendar },
+  { to: '/reminders', label: 'Reminders', icon: IconBell },
+];
+
+/* ── Layout chrome ─────────────────────────────────────────────────────── */
+
+const Shell = styled.div<{ $collapsed: boolean }>`
+  display: grid;
+  grid-template-columns: ${p => p.$collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)'} 1fr;
+  height: 100vh;
   width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  background: var(--bg-0);
+  position: relative;
+  z-index: 1;
+  transition: grid-template-columns 0.2s ease;
+
+  @media (max-width: 720px) {
+    grid-template-columns: var(--sidebar-w-collapsed) 1fr;
+  }
 `;
 
-const AppContainer = styled.div<{ backgroundImage: string }>`
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-image: url(${props => props.backgroundImage});
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-`;
-
-const Window = styled.div`
-  width: 95%;
-  height: 90%;
-  max-width: 1200px;
-  max-height: 900px;
+const Sidebar = styled.aside`
+  background: var(--bg-1);
+  border-right: 1px solid var(--border-1);
   display: flex;
   flex-direction: column;
-  background: #ececec;
-  border-radius: 8px;
   overflow: hidden;
 `;
 
-const TitleBar = styled.div`
+const Brand = styled.div<{ $collapsed: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4);
+  height: var(--topbar-h);
+  border-bottom: 1px solid var(--border-1);
+  flex-shrink: 0;
+
+  .logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    color: #06121d;
+    flex-shrink: 0;
+    box-shadow: 0 0 24px var(--accent-glow);
+
+    svg { width: 18px; height: 18px; }
+  }
+
+  .name {
+    display: ${p => p.$collapsed ? 'none' : 'flex'};
+    flex-direction: column;
+    line-height: 1.1;
+    overflow: hidden;
+  }
+
+  .name strong { font-size: 13px; font-weight: 600; color: var(--text-1); letter-spacing: 0.02em; }
+  .name span { font-size: 10.5px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
+`;
+
+const SidebarSectionLabel = styled.div<{ $collapsed: boolean }>`
+  display: ${p => p.$collapsed ? 'none' : 'block'};
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+  padding: var(--s-3) var(--s-5) var(--s-2);
+`;
+
+const Nav = styled.nav`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-2) var(--s-2) var(--s-3);
+  gap: 2px;
+  overflow-y: auto;
+`;
+
+const NavLinkStyled = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: ${p => p.$collapsed ? '10px' : '8px 12px'};
+  margin: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: ${p => p.$active ? 'var(--text-1)' : 'var(--text-2)'};
+  background: ${p => p.$active ? 'var(--bg-3)' : 'transparent'};
+  text-decoration: none;
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+  justify-content: ${p => p.$collapsed ? 'center' : 'flex-start'};
+
+  &:hover { color: var(--text-1); background: var(--bg-3); }
+
+  ${p => p.$active && `
+    &:before {
+      content: '';
+      position: absolute;
+      left: -10px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+  `}
+
+  svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .label { display: ${p => p.$collapsed ? 'none' : 'inline'}; }
+`;
+
+const SidebarFooter = styled.div`
+  padding: var(--s-3);
+  border-top: 1px solid var(--border-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+
+const FooterButton = styled.button<{ $collapsed: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: ${p => p.$collapsed ? '10px' : '8px 12px'};
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  justify-content: ${p => p.$collapsed ? 'center' : 'flex-start'};
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: var(--bg-3); color: var(--text-1); }
+
+  svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .label { display: ${p => p.$collapsed ? 'none' : 'inline'}; }
+`;
+
+/* ── Topbar / content ──────────────────────────────────────────────────── */
+
+const Main = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+`;
+
+const Topbar = styled.header`
+  height: var(--topbar-h);
+  border-bottom: 1px solid var(--border-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  background: linear-gradient(180deg, #0a246a, #0d47a1);
-  color: white;
+  padding: 0 var(--s-5);
+  background: rgba(7, 9, 13, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  flex-shrink: 0;
 `;
 
-const TitleText = styled.span`
-  font-weight: 600;
-  font-size: 13px;
+const TopbarLeft = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-3);
 `;
 
-const WindowControls = styled.div`
+const Crumbs = styled.div`
   display: flex;
-  gap: 4px;
-`;
-
-const WindowButton = styled.button`
-  width: 22px;
-  height: 22px;
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 3px;
-  background: rgba(255,255,255,0.1);
-  color: white;
+  align-items: center;
+  gap: var(--s-2);
   font-size: 12px;
+  color: var(--text-3);
+
+  .sep { color: var(--text-4); }
+  .here { color: var(--text-1); font-weight: 500; }
+`;
+
+const TopbarRight = styled.div`
   display: flex;
   align-items: center;
-  justify-content: center;
-  
-  &:hover {
-    background: rgba(255,255,255,0.2);
+  gap: var(--s-3);
+`;
+
+const StatusPill = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
   }
 `;
 
-const NavBar = styled.div`
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px;
-  background: linear-gradient(180deg, #f8f9fa, #e9ecef);
-  border-bottom: 1px solid #dee2e6;
-`;
-
-const NavLink = styled(Link)`
-  text-decoration: none;
-`;
-
-const NavButton = styled.button<{ $active?: boolean }>`
-  font-size: 13px;
-  padding: 8px 16px;
-  font-weight: ${props => props.$active ? '600' : '500'};
-  background: ${props => props.$active ? '#fff' : 'transparent'};
-  border: 1px solid ${props => props.$active ? '#dee2e6' : 'transparent'};
-  border-bottom: ${props => props.$active ? '1px solid #fff' : '1px solid transparent'};
-  border-radius: 4px 4px 0 0;
-  margin-bottom: -1px;
+const Clock = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: ${props => props.$active ? '#0a246a' : '#495057'};
-  transition: all 0.15s;
-  
-  &:hover {
-    background: ${props => props.$active ? '#fff' : 'rgba(0,0,0,0.05)'};
-    color: #0a246a;
-  }
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 
-  svg {
-    width: 18px;
-    height: 18px;
-  }
+  svg { width: 14px; height: 14px; color: var(--text-3); }
 `;
 
-const LogoutButton = styled.button`
-  margin-left: auto;
-  font-size: 13px;
-  padding: 8px 16px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #495057;
-  font-weight: 500;
-  
-  svg {
-    width: 18px;
-    height: 18px;
-  }
-  
-  &:hover {
-    background: rgba(220,53,69,0.1);
-    color: #dc3545;
-    border-color: rgba(220,53,69,0.2);
-  }
-`;
-
-const MainContent = styled.div`
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-`;
-
-const ContentArea = styled.div`
+const Content = styled.main`
   flex: 1;
   overflow: auto;
-  padding: 12px 15px;
-  background: #f5f5f5;
-`;
-
-const StatusBar = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 12px;
-  background: linear-gradient(180deg, #f0f0f0, #e0e0e0);
-  border-top: 1px solid #ccc;
-  font-size: 12px;
-  color: #555;
-`;
-
-const StatusLeft = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-`;
-
-const StatusIndicator = styled.span`
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  
-  &:before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    background: #28a745;
-    border-radius: 50%;
-  }
-`;
-
-const StatusDateTime = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 15px;
-`;
-
-const StatusDate = styled.div`
-  cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 3px;
   position: relative;
-  
-  &:hover {
-    background: rgba(0,0,0,0.05);
+  isolation: isolate;
+`;
+
+const ContentInner = styled.div`
+  position: relative;
+  z-index: 1;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--s-6) var(--s-6);
+
+  @media (max-width: 720px) {
+    padding: var(--s-4);
   }
 `;
 
-const DatePicker = styled.input`
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: 4px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  font-size: 13px;
-  display: none;
-  
-  &.visible {
-    display: block;
-  }
-`;
-
-const StatusTime = styled.div`
-  font-weight: 600;
-  color: #333;
-`;
-
-const StickyNoteWrapper = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 1000;
+const StickyLayer = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 200;
   pointer-events: none;
-
-  > * {
-    pointer-events: auto;
-  }
+  > * { pointer-events: auto; }
 `;
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(true);
-  const [showNotes, setShowNotes] = useState(false);
   const { logout } = useAuth();
   const { currentDate, setCurrentDate } = useAppContext();
-  const [backgroundId, setBackgroundId] = useState('bliss');
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('sidebarCollapsed') === '1';
+  });
+  const [showNotes, setShowNotes] = useState(false);
 
   useEffect(() => {
-    if (!showDatePicker) {
-      const timer = setInterval(() => {
-        setCurrentDate(new Date());
-      }, 60000);
-      return () => clearInterval(timer);
-    }
-  }, [showDatePicker, setCurrentDate]);
+    localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+  }, [collapsed]);
+
+  useEffect(() => {
+    const t = setInterval(() => setCurrentDate(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, [setCurrentDate]);
+
+  const currentLabel = useMemo(() => {
+    const match = NAV_PRIMARY.find(n => n.to === location.pathname);
+    return match?.label ?? 'Overview';
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.title = `${currentLabel} · Capsuna`;
+  }, [currentLabel]);
 
   const handleLogout = () => {
-    if (window.confirm('Are you sure you want to log out?')) {
-      logout();
-    }
-  };
-
-  const handleDateDoubleClick = () => {
-    setShowDatePicker(!showDatePicker);
-  };
-
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = new Date(e.target.value);
-    if (!isNaN(newDate.getTime())) {
-      setCurrentDate(newDate);
-    }
-  };
-
-  const handleBackgroundChange = (newBackgroundId: string) => {
-    setBackgroundId(newBackgroundId);
-    localStorage.setItem('preferredBackgroundId', newBackgroundId);
-  };
-
-  useEffect(() => {
-    const savedBackgroundId = localStorage.getItem('preferredBackgroundId');
-    if (savedBackgroundId) {
-      setBackgroundId(savedBackgroundId);
-    }
-  }, []);
-
-  const handleDashboardClick = () => {
-    setShowDashboard(!showDashboard);
-    if (!showDashboard) {
-      navigate('/');
-    }
-  };
-
-  const handleNotesClick = () => {
-    setShowNotes(!showNotes);
-  };
-
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case '/': return 'Dashboard';
-      case '/tasks': return 'Tasks';
-      case '/meetings': return 'Meetings';
-      case '/reminders': return 'Reminders';
-      default: return 'Dashboard';
-    }
+    if (window.confirm('Sign out of the control panel?')) logout();
   };
 
   return (
-    <LayoutContainer>
-      <AppContainer backgroundImage={getBackgroundById(backgroundId)}>
-        <DesktopIcons
-          onDashboardClick={handleDashboardClick}
-          onNotesClick={handleNotesClick}
-        />
-        {showDashboard && (
-          <Window className="window">
-            <TitleBar>
-              <TitleText>
-                📋 Retro Task Manager - {getPageTitle()}
-              </TitleText>
-              <WindowControls>
-                <WindowButton onClick={() => setShowDashboard(false)}>─</WindowButton>
-                <WindowButton>□</WindowButton>
-                <WindowButton onClick={() => setShowDashboard(false)}>✕</WindowButton>
-              </WindowControls>
-            </TitleBar>
+    <Shell $collapsed={collapsed}>
+      <Sidebar>
+        <Brand $collapsed={collapsed}>
+          <div className="logo"><IconSpark /></div>
+          <div className="name">
+            <strong>Capsuna</strong>
+            <span>control panel</span>
+          </div>
+        </Brand>
 
-            <NavBar>
-              <NavLink to="/">
-                <NavButton $active={location.pathname === '/'}>
-                  <Computer3 />
-                  Dashboard
-                </NavButton>
-              </NavLink>
-              <NavLink to="/tasks">
-                <NavButton $active={location.pathname === '/tasks'}>
-                  <BatWait />
-                  Tasks
-                </NavButton>
-              </NavLink>
-              <NavLink to="/meetings">
-                <NavButton $active={location.pathname === '/meetings'}>
-                  <Awschd32402 />
-                  Meetings
-                </NavButton>
-              </NavLink>
-              <NavLink to="/reminders">
-                <NavButton $active={location.pathname === '/reminders'}>
-                  <Confcp118 />
-                  Reminders
-                </NavButton>
-              </NavLink>
-              <LogoutButton onClick={handleLogout}>
-                <Shell3213 />
-                Logout
-              </LogoutButton>
-            </NavBar>
+        <SidebarSectionLabel $collapsed={collapsed}>Workspace</SidebarSectionLabel>
+        <Nav>
+          {NAV_PRIMARY.map(item => {
+            const Icon = item.icon;
+            const active = location.pathname === item.to;
+            return (
+              <NavLinkStyled
+                key={item.to}
+                to={item.to}
+                $active={active}
+                $collapsed={collapsed}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon />
+                <span className="label">{item.label}</span>
+              </NavLinkStyled>
+            );
+          })}
+        </Nav>
 
-            <MainContent>
-              <ContentArea>
-                {children}
-              </ContentArea>
-            </MainContent>
+        <SidebarFooter>
+          <FooterButton $collapsed={collapsed} onClick={() => setShowNotes(true)} title={collapsed ? 'Notes' : undefined}>
+            <IconNote /> <span className="label">Notes</span>
+          </FooterButton>
+          <FooterButton $collapsed={collapsed} onClick={handleLogout} title={collapsed ? 'Sign out' : undefined}>
+            <IconLogout /> <span className="label">Sign out</span>
+          </FooterButton>
+        </SidebarFooter>
+      </Sidebar>
 
-            <StatusBar>
-              <StatusLeft>
-                <StatusIndicator>Ready</StatusIndicator>
-              </StatusLeft>
-              <StatusDateTime>
-                <StatusDate onDoubleClick={handleDateDoubleClick}>
-                  📅 {format(currentDate, 'EEE, MMM d, yyyy')}
-                  <DatePicker
-                    type="datetime-local"
-                    className={showDatePicker ? 'visible' : ''}
-                    value={format(currentDate, "yyyy-MM-dd'T'HH:mm")}
-                    onChange={handleDateChange}
-                  />
-                </StatusDate>
-                <StatusTime>🕐 {format(currentDate, 'h:mm a')}</StatusTime>
-              </StatusDateTime>
-            </StatusBar>
-          </Window>
-        )}
-      </AppContainer>
-      <StickyNoteWrapper>
-        {showNotes && (
-          <StickyNote onClose={() => setShowNotes(false)} />
-        )}
-      </StickyNoteWrapper>
-      <BackgroundSwitcher onBackgroundChange={handleBackgroundChange} />
-    </LayoutContainer>
+      <Main>
+        <Topbar>
+          <TopbarLeft>
+            <IconButton
+              $variant="ghost"
+              onClick={() => setCollapsed(c => !c)}
+              aria-label="Toggle sidebar"
+              style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
+            >
+              <IconChevronLeft />
+            </IconButton>
+            <Crumbs>
+              <span>Workspace</span>
+              <span className="sep">/</span>
+              <span className="here">{currentLabel}</span>
+            </Crumbs>
+          </TopbarLeft>
+          <TopbarRight>
+            <StatusPill>
+              <span className="dot" />
+              <span>SYSTEMS NOMINAL</span>
+            </StatusPill>
+            <Clock>
+              <IconClock />
+              <span>{format(currentDate, 'EEE, MMM d')}</span>
+              <span style={{ color: 'var(--text-3)' }}>·</span>
+              <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{format(currentDate, 'HH:mm')}</span>
+            </Clock>
+          </TopbarRight>
+        </Topbar>
+
+        <Content>
+          <BackgroundFx />
+          <ContentInner>{children}</ContentInner>
+        </Content>
+      </Main>
+
+      <StickyLayer>
+        {showNotes && <StickyNote onClose={() => setShowNotes(false)} />}
+      </StickyLayer>
+    </Shell>
   );
 };
 

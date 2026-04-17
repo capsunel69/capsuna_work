@@ -1,133 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import type { Task } from '../types';
 import {
-  FormRow,
-  FormRowHorizontal,
-  Label,
-  Input,
-  DateInput,
-  Select,
-  TextArea,
-  ButtonRow,
-  PrimaryButton,
-  SecondaryButton
-} from './shared/FormStyles';
+  Stack, Row, Field, FieldGroup, Label, Input, Select, Textarea, Button,
+} from './ui/primitives';
+import { IconEdit, IconCheck } from './ui/icons';
 
-const EditContainer = styled.div`
-  padding: 15px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e5e5e5;
-  border-left: 4px solid #007bff;
+const Wrap = styled.div`
+  padding: var(--s-4) var(--s-5);
+  background: var(--bg-3);
+  border-left: 2px solid var(--accent);
+  border-top: 1px solid var(--border-1);
+
+  &:first-child { border-top: none; }
 `;
 
-const EditTitle = styled.div`
-  font-size: 13px;
+const Heading = styled.div`
+  font-size: 12px;
   font-weight: 600;
-  color: #495057;
-  margin-bottom: 15px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-bottom: var(--s-3);
+
+  svg { width: 14px; height: 14px; color: var(--accent); }
 `;
 
-interface TaskEditFormProps {
+interface Props {
   task: Task;
-  onSave: (taskId: string, updatedTask: Partial<Task>) => void;
+  onSave: (taskId: string, updated: Partial<Task>) => void;
   onCancel: () => void;
   isLoading?: boolean;
 }
 
-const TaskEditForm: React.FC<TaskEditFormProps> = ({ task, onSave, onCancel, isLoading = false }) => {
+const TaskEditForm: React.FC<Props> = ({ task, onSave, onCancel, isLoading }) => {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>(task.priority);
-  const [dueDate, setDueDate] = useState(
-    task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ''
-  );
+  const [dueDate, setDueDate] = useState(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '');
 
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.description);
     setPriority(task.priority);
-    setDueDate(
-      task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ''
-    );
+    setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '');
   }, [task]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(task.id, {
-      title,
-      description,
-      priority,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-    });
+    onSave(task.id, { title, description, priority, dueDate: dueDate ? new Date(dueDate) : undefined });
   };
 
   return (
-    <EditContainer>
-      <EditTitle>✏️ Edit Task</EditTitle>
-      <form onSubmit={handleSubmit}>
-        <FormRow>
-          <Label htmlFor="edit-title">Title</Label>
-          <Input
-            id="edit-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            disabled={isLoading}
-          />
-        </FormRow>
-        
-        <FormRow>
-          <Label htmlFor="edit-description">Description</Label>
-          <TextArea
-            id="edit-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            disabled={isLoading}
-          />
-        </FormRow>
-        
-        <FormRowHorizontal>
-          <FormRow>
-            <Label htmlFor="edit-priority">Priority</Label>
-            <Select
-              id="edit-priority"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-              disabled={isLoading}
-            >
-              <option value="low">🟢 Low</option>
-              <option value="medium">🟠 Medium</option>
-              <option value="high">🔴 High</option>
-            </Select>
-          </FormRow>
-          
-          <FormRow>
-            <Label htmlFor="edit-dueDate">Due Date</Label>
-            <DateInput
-              id="edit-dueDate"
-              type="datetime-local"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              disabled={isLoading}
-            />
-          </FormRow>
-        </FormRowHorizontal>
-        
-        <ButtonRow>
-          <PrimaryButton type="submit" disabled={isLoading}>
-            {isLoading ? 'Saving...' : '✓ Save Changes'}
-          </PrimaryButton>
-          <SecondaryButton type="button" onClick={onCancel} disabled={isLoading}>
-            Cancel
-          </SecondaryButton>
-        </ButtonRow>
+    <Wrap>
+      <Heading><IconEdit /> Edit task</Heading>
+      <form onSubmit={submit}>
+        <Stack $gap={3}>
+          <Field>
+            <Label>Title</Label>
+            <Input value={title} onChange={e => setTitle(e.target.value)} required disabled={isLoading} />
+          </Field>
+          <Field>
+            <Label>Description</Label>
+            <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} disabled={isLoading} />
+          </Field>
+          <FieldGroup>
+            <Field>
+              <Label>Priority</Label>
+              <Select value={priority} onChange={e => setPriority(e.target.value as any)} disabled={isLoading}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </Select>
+            </Field>
+            <Field>
+              <Label>Due date</Label>
+              <Input type="datetime-local" value={dueDate} onChange={e => setDueDate(e.target.value)} disabled={isLoading} />
+            </Field>
+          </FieldGroup>
+          <Row $gap={2}>
+            <Button $variant="primary" type="submit" disabled={isLoading}>
+              {isLoading ? 'Saving…' : <><IconCheck /> Save</>}
+            </Button>
+            <Button $variant="ghost" type="button" onClick={onCancel} disabled={isLoading}>Cancel</Button>
+          </Row>
+        </Stack>
       </form>
-    </EditContainer>
+    </Wrap>
   );
 };
 

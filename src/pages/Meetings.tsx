@@ -1,460 +1,278 @@
 import React, { useState } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { format } from 'date-fns';
 import styled from 'styled-components';
+import { format } from 'date-fns';
+import { useAppContext } from '../context/AppContext';
 import type { Meeting } from '../types';
 import LinkifyText from '../components/shared/LinkifyText';
 import {
-  FormRow,
-  FormRowHorizontal,
-  Label,
-  Input,
-  DateInput,
-  TextArea,
-  ButtonRow,
-  PrimaryButton,
-  SecondaryButton
-} from '../components/shared/FormStyles';
+  PageContainer, PageHeader, PageTitle, PageSubtitle,
+  Card, CardHeader, CardTitle, CardSubtle, CardBody, CardSection,
+  Button, IconButton, Badge, Checkbox, EmptyState,
+  Stack, Row, Textarea,
+  ModalOverlay, ModalCard,
+  Composer, ComposerTitle, ComposerBody, ComposerToolbar, ComposerSpacer,
+  Chip, GhostInput,
+} from '../components/ui/primitives';
+import {
+  IconCalendar, IconPlus, IconTrash, IconEdit, IconClock, IconUsers, IconX,
+} from '../components/ui/icons';
 
-const PageContainer = styled.div`
-  width: 100%;
-`;
-
-const PageTitle = styled.h1`
-  font-size: 18px;
-  margin-bottom: 12px;
-  font-weight: 600;
-  color: #003087;
+const MeetingRow = styled.div<{ $done?: boolean }>`
+  padding: var(--s-4) var(--s-5);
   display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  &:before {
-    content: '📅';
-    font-size: 20px;
-  }
-`;
-
-const Card = styled.div`
-  background: #fff;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 12px;
-`;
-
-const CardHeader = styled.div<{ color?: string }>`
-  background: ${props => props.color || '#0a246a'};
-  color: white;
-  padding: 10px 15px;
-  font-weight: 600;
-  font-size: 13px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const CardBody = styled.div`
-  padding: 0;
-`;
-
-const MeetingItem = styled.div<{ completed?: boolean }>`
-  padding: 15px;
-  border-bottom: 1px solid #e5e5e5;
-  background: ${props => props.completed ? '#fafafa' : '#fff'};
-  
-  &:last-child {
-    border-bottom: none;
-  }
-  
-  &:hover {
-    background: ${props => props.completed ? '#f5f5f5' : '#f0f4ff'};
-  }
-`;
-
-const MeetingHeader = styled.div`
-  display: flex;
+  gap: var(--s-3);
   align-items: flex-start;
-  gap: 12px;
+  border-top: 1px solid var(--border-1);
+
+  &:first-child { border-top: none; }
+  &:hover { background: var(--bg-3); }
+
+  ${p => p.$done && `opacity: 0.7;`}
 `;
 
-const Checkbox = styled.button<{ checked: boolean }>`
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  border: 2px solid ${props => props.checked ? '#28a745' : '#aaa'};
-  background: ${props => props.checked ? '#28a745' : '#fff'};
-  border-radius: 3px;
-  cursor: pointer;
+const Title = styled.h3<{ $done?: boolean }>`
+  font-size: 14px;
+  font-weight: 600;
+  color: ${p => p.$done ? 'var(--text-3)' : 'var(--text-1)'};
+  text-decoration: ${p => p.$done ? 'line-through' : 'none'};
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-top: 2px;
-  
-  &:after {
-    content: '${props => props.checked ? '✓' : ''}';
-    color: white;
-    font-size: 14px;
-    font-weight: bold;
-  }
+  gap: var(--s-2);
+  flex-wrap: wrap;
 `;
 
-const MeetingContent = styled.div`
+const Description = styled.p`
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 6px 0 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+`;
+
+const MetaRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: var(--s-2);
+
+  span { display: flex; align-items: center; gap: 6px; }
+  svg { width: 13px; height: 13px; }
+`;
+
+const NotesBox = styled.div`
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  line-height: 1.55;
+
+  strong { color: var(--text-1); margin-right: 6px; }
+`;
+
+const Body = styled.div`
   flex: 1;
   min-width: 0;
 `;
 
-const MeetingTitle = styled.h3<{ completed?: boolean }>`
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0 0 6px 0;
-  color: ${props => props.completed ? '#888' : '#1a1a1a'};
-  text-decoration: ${props => props.completed ? 'line-through' : 'none'};
+const Actions = styled.div`
   display: flex;
-  align-items: center;
-  gap: 10px;
-`;
-
-const Badge = styled.span<{ variant?: 'danger' | 'info' }>`
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  background: ${props => props.variant === 'danger' ? '#dc3545' : '#17a2b8'};
-  color: white;
-`;
-
-const MeetingDescription = styled.p`
-  font-size: 13px;
-  color: #555;
-  margin: 0 0 8px 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-`;
-
-const MeetingMeta = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  font-size: 12px;
-  color: #666;
-  margin-top: 8px;
-`;
-
-const MeetingNotes = styled.div`
-  margin-top: 10px;
-  padding: 10px;
-  background: #f8f9fa;
-  border-left: 3px solid #0a246a;
-  font-size: 13px;
-  color: #555;
-  white-space: pre-wrap;
-`;
-
-const MeetingActions = styled.div`
-  display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-`;
-
-const Button = styled.button<{ variant?: 'primary' | 'danger' | 'secondary' }>`
-  padding: 6px 14px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  
-  background: ${props => {
-    switch (props.variant) {
-      case 'danger': return '#dc3545';
-      case 'secondary': return '#6c757d';
-      default: return '#007bff';
-    }
-  }};
-  color: white;
-  
-  &:hover {
-    background: ${props => {
-      switch (props.variant) {
-        case 'danger': return '#c82333';
-        case 'secondary': return '#5a6268';
-        default: return '#0056b3';
-      }
-    }};
-  }
-`;
-
-const EmptyState = styled.div`
-  padding: 40px 20px;
-  text-align: center;
-  color: #888;
-  font-size: 14px;
-`;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  padding: 20px;
-  border-radius: 6px;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-`;
-
-const ModalTitle = styled.h3`
-  margin: 0 0 15px 0;
-  font-size: 16px;
-  color: #1a1a1a;
 `;
 
 const Meetings: React.FC = () => {
   const { meetings, addMeeting, updateMeeting, deleteMeeting, toggleMeetingCompletion } = useAppContext();
-  
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [duration, setDuration] = useState(30);
   const [participants, setParticipants] = useState('');
-  const [notes, setNotes] = useState('');
-  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState('');
-  
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setDate('');
-    setDuration(30);
-    setParticipants('');
-    setNotes('');
+  const [open, setOpen] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
+
+  const reset = () => {
+    setTitle(''); setDescription(''); setDate(''); setDuration(30); setParticipants('');
+    setShowDescription(false); setShowParticipants(false);
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     addMeeting({
-      title,
-      description,
-      date: new Date(date),
-      duration,
-      participants: participants.split(',').map(p => p.trim()).filter(p => p !== ''),
-      notes,
-      completed: false,
+      title, description, date: new Date(date), duration,
+      participants: participants.split(',').map(p => p.trim()).filter(Boolean),
+      notes: '', completed: false,
     });
-    resetForm();
+    reset();
   };
-  
-  const handleOpenNotesModal = (meeting: Meeting) => {
-    setEditingMeetingId(meeting.id);
-    setEditingNotes(meeting.notes || '');
-    setIsNotesModalOpen(true);
-  };
-  
-  const handleSaveNotes = () => {
-    if (editingMeetingId) {
-      updateMeeting(editingMeetingId, { notes: editingNotes });
-      setIsNotesModalOpen(false);
-      setEditingMeetingId(null);
-      setEditingNotes('');
+
+  const openNotes = (m: Meeting) => { setEditingId(m.id); setEditingNotes(m.notes || ''); setOpen(true); };
+  const saveNotes = () => {
+    if (editingId) {
+      updateMeeting(editingId, { notes: editingNotes });
+      setOpen(false); setEditingId(null); setEditingNotes('');
     }
   };
 
-  const upcomingMeetings = meetings.filter(m => !m.completed);
-  const completedMeetings = meetings.filter(m => m.completed);
-  
+  const upcoming = meetings.filter(m => !m.completed);
+  const completed = meetings.filter(m => m.completed);
+
   return (
     <PageContainer>
-      <PageTitle>Meetings</PageTitle>
-      
-      <Card>
-        <CardHeader color="linear-gradient(180deg, #495057, #343a40)">
-          ➕ Schedule New Meeting
-        </CardHeader>
-        <div style={{ padding: 15 }}>
-          <form onSubmit={handleSubmit}>
-            <FormRow>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-                placeholder="Meeting title..."
-                required
-              />
-            </FormRow>
-            
-            <FormRow>
-              <Label htmlFor="description">Description</Label>
-              <TextArea
-                id="description"
-                value={description}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-                placeholder="Meeting agenda or details..."
-                rows={2}
-              />
-            </FormRow>
-            
-            <FormRowHorizontal>
-              <FormRow>
-                <Label htmlFor="date">Date & Time</Label>
-                <DateInput
-                  id="date"
-                  type="datetime-local"
-                  value={date}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)}
-                  required
-                />
-              </FormRow>
-              
-              <FormRow>
-                <Label htmlFor="duration">Duration (min)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  value={duration}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDuration(Number(e.target.value))}
-                  min={5}
-                  required
-                />
-              </FormRow>
-            </FormRowHorizontal>
-            
-            <FormRow>
-              <Label htmlFor="participants">Participants (comma separated)</Label>
-              <Input
-                id="participants"
-                value={participants}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setParticipants(e.target.value)}
-                placeholder="John, Jane, Alex..."
-              />
-            </FormRow>
-            
-            <ButtonRow>
-              <PrimaryButton type="submit">+ Schedule Meeting</PrimaryButton>
-              <SecondaryButton type="button" onClick={resetForm}>Clear</SecondaryButton>
-            </ButtonRow>
-          </form>
+      <PageHeader>
+        <div>
+          <PageTitle><IconCalendar /> Meetings</PageTitle>
+          <PageSubtitle>Schedule, attend, document</PageSubtitle>
         </div>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          📅 Upcoming Meetings ({upcomingMeetings.length})
-        </CardHeader>
-        <CardBody>
-          {upcomingMeetings.length === 0 ? (
-            <EmptyState>No upcoming meetings scheduled</EmptyState>
-          ) : (
-            upcomingMeetings.map(meeting => (
-              <MeetingItem key={meeting.id}>
-                <MeetingHeader>
-                  <Checkbox
-                    checked={false}
-                    onClick={() => toggleMeetingCompletion(meeting.id)}
-                  />
-                  <MeetingContent>
-                    <MeetingTitle>
-                      {meeting.title}
-                      {new Date(meeting.date) < new Date() && <Badge variant="danger">OVERDUE</Badge>}
-                    </MeetingTitle>
-                    {meeting.description && (
-                      <MeetingDescription>
-                        <LinkifyText text={meeting.description} />
-                      </MeetingDescription>
-                    )}
-                    <MeetingMeta>
-                      <span>📅 {format(new Date(meeting.date), 'MMM d, yyyy h:mm a')}</span>
-                      <span>⏱ {meeting.duration} min</span>
-                      {meeting.participants.length > 0 && (
-                        <span>👥 {meeting.participants.join(', ')}</span>
-                      )}
-                    </MeetingMeta>
-                    {meeting.notes && (
-                      <MeetingNotes>
-                        <strong>Notes:</strong> {meeting.notes}
-                      </MeetingNotes>
-                    )}
-                  </MeetingContent>
-                  <MeetingActions>
-                    <Button onClick={() => handleOpenNotesModal(meeting)}>
-                      {meeting.notes ? '✎ Notes' : '+ Notes'}
-                    </Button>
-                    <Button variant="danger" onClick={() => deleteMeeting(meeting.id)}>
-                      ✕
-                    </Button>
-                  </MeetingActions>
-                </MeetingHeader>
-              </MeetingItem>
-            ))
+      </PageHeader>
+
+      <Composer onSubmit={submit}>
+        <ComposerTitle
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Meeting title…"
+          required
+        />
+        {(showDescription || description) && (
+          <ComposerBody
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Agenda, links, context…"
+            rows={2}
+          />
+        )}
+        {(showParticipants || participants) && (
+          <ComposerBody
+            value={participants}
+            onChange={e => setParticipants(e.target.value)}
+            placeholder="Participants — comma separated"
+            rows={1}
+            style={{ minHeight: 28 }}
+          />
+        )}
+        <ComposerToolbar>
+          <GhostInput
+            type="datetime-local"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            required
+            aria-label="Date and time"
+          />
+          <GhostInput
+            type="number"
+            value={duration}
+            onChange={e => setDuration(Number(e.target.value))}
+            min={5}
+            step={5}
+            aria-label="Duration in minutes"
+            title="Duration (min)"
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>min</span>
+
+          <Chip type="button" $active={showDescription} onClick={() => setShowDescription(s => !s)}>
+            <IconEdit /> {showDescription ? 'Hide agenda' : 'Agenda'}
+          </Chip>
+          <Chip type="button" $active={showParticipants} onClick={() => setShowParticipants(s => !s)}>
+            <IconUsers /> {showParticipants ? 'Hide people' : 'People'}
+          </Chip>
+
+          <ComposerSpacer />
+          {(title || description || date || participants) && (
+            <Chip type="button" onClick={reset}>Clear</Chip>
           )}
+          <Button $variant="primary" $size="sm" type="submit" disabled={!title.trim() || !date}>
+            <IconPlus /> Schedule
+          </Button>
+        </ComposerToolbar>
+      </Composer>
+
+      <Card>
+        <CardHeader><CardTitle><IconCalendar /> Upcoming <CardSubtle>{upcoming.length}</CardSubtle></CardTitle></CardHeader>
+        <CardBody>
+          {upcoming.length === 0 ? (
+            <EmptyState><IconCalendar /><div>No upcoming meetings.</div></EmptyState>
+          ) : upcoming.map(m => (
+            <MeetingRow key={m.id}>
+              <Checkbox $checked={false} onClick={() => toggleMeetingCompletion(m.id)} style={{ marginTop: 3 }} />
+              <Body>
+                <Title>
+                  {m.title}
+                  {new Date(m.date) < new Date() && <Badge $variant="danger">Overdue</Badge>}
+                </Title>
+                {m.description && <Description><LinkifyText text={m.description} /></Description>}
+                <MetaRow>
+                  <span><IconClock /> {format(new Date(m.date), 'MMM d, yyyy · HH:mm')}</span>
+                  <span><IconClock /> {m.duration} min</span>
+                  {m.participants.length > 0 && <span><IconUsers /> {m.participants.join(', ')}</span>}
+                </MetaRow>
+                {m.notes && <NotesBox><strong>Notes</strong>{m.notes}</NotesBox>}
+              </Body>
+              <Actions>
+                <Button $size="sm" $variant="ghost" onClick={() => openNotes(m)}>
+                  <IconEdit /> {m.notes ? 'Notes' : 'Add notes'}
+                </Button>
+                <IconButton $size="sm" $variant="danger" onClick={() => deleteMeeting(m.id)} title="Delete">
+                  <IconTrash />
+                </IconButton>
+              </Actions>
+            </MeetingRow>
+          ))}
         </CardBody>
       </Card>
-      
-      {completedMeetings.length > 0 && (
+
+      {completed.length > 0 && (
         <Card>
-          <CardHeader color="linear-gradient(180deg, #6c757d, #545b62)">
-            ✅ Completed Meetings ({completedMeetings.length})
-          </CardHeader>
+          <CardHeader><CardTitle>Completed <CardSubtle>{completed.length}</CardSubtle></CardTitle></CardHeader>
           <CardBody>
-            {completedMeetings.map(meeting => (
-              <MeetingItem key={meeting.id} completed>
-                <MeetingHeader>
-                  <Checkbox
-                    checked={true}
-                    onClick={() => toggleMeetingCompletion(meeting.id)}
-                  />
-                  <MeetingContent>
-                    <MeetingTitle completed>{meeting.title}</MeetingTitle>
-                    <MeetingMeta>
-                      <span>📅 {format(new Date(meeting.date), 'MMM d, yyyy')}</span>
-                      <span>⏱ {meeting.duration} min</span>
-                    </MeetingMeta>
-                  </MeetingContent>
-                  <MeetingActions>
-                    <Button variant="danger" onClick={() => deleteMeeting(meeting.id)}>
-                      ✕
-                    </Button>
-                  </MeetingActions>
-                </MeetingHeader>
-              </MeetingItem>
+            {completed.map(m => (
+              <MeetingRow key={m.id} $done>
+                <Checkbox $checked={true} onClick={() => toggleMeetingCompletion(m.id)} style={{ marginTop: 3 }} />
+                <Body>
+                  <Title $done>{m.title}</Title>
+                  <MetaRow>
+                    <span><IconClock /> {format(new Date(m.date), 'MMM d, yyyy')}</span>
+                    <span><IconClock /> {m.duration} min</span>
+                  </MetaRow>
+                </Body>
+                <Actions>
+                  <IconButton $size="sm" $variant="danger" onClick={() => deleteMeeting(m.id)} title="Delete">
+                    <IconTrash />
+                  </IconButton>
+                </Actions>
+              </MeetingRow>
             ))}
           </CardBody>
         </Card>
       )}
-      
-      {isNotesModalOpen && (
-        <ModalOverlay onClick={() => setIsNotesModalOpen(false)}>
-          <ModalContent onClick={e => e.stopPropagation()}>
-            <ModalTitle>📝 Meeting Notes</ModalTitle>
-            <FormRow>
-              <TextArea
-                value={editingNotes}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditingNotes(e.target.value)}
-                rows={6}
-                placeholder="Add meeting notes..."
-                autoFocus
-              />
-            </FormRow>
-            <ButtonRow>
-              <PrimaryButton onClick={handleSaveNotes}>Save Notes</PrimaryButton>
-              <SecondaryButton onClick={() => setIsNotesModalOpen(false)}>Cancel</SecondaryButton>
-            </ButtonRow>
-          </ModalContent>
+
+      {open && (
+        <ModalOverlay onClick={() => setOpen(false)}>
+          <ModalCard onClick={e => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle><IconEdit /> Meeting notes</CardTitle>
+              <IconButton $variant="ghost" $size="sm" onClick={() => setOpen(false)}><IconX /></IconButton>
+            </CardHeader>
+            <CardSection>
+              <Stack $gap={3}>
+                <Textarea value={editingNotes} onChange={e => setEditingNotes(e.target.value)} rows={8} placeholder="Capture key points, decisions, action items…" autoFocus />
+                <Row $gap={2}>
+                  <Button $variant="primary" onClick={saveNotes}>Save notes</Button>
+                  <Button $variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                </Row>
+              </Stack>
+            </CardSection>
+          </ModalCard>
         </ModalOverlay>
       )}
     </PageContainer>

@@ -1,712 +1,402 @@
 import React, { useState } from 'react';
-import { useAppContext } from '../context/AppContext';
 import styled from 'styled-components';
 import { format, isPast } from 'date-fns';
+import { useAppContext } from '../context/AppContext';
 import LinkifyText from '../components/shared/LinkifyText';
-import {
-  FormRow,
-  FormRowHorizontal,
-  Label,
-  Input,
-  DateInput,
-  Select,
-  TextArea,
-  ButtonRow,
-  PrimaryButton,
-  SecondaryButton
-} from '../components/shared/FormStyles';
-import TaskEditForm from '../components/TaskEditForm';
 import LoadingState from '../components/shared/LoadingState';
 import ErrorMessage from '../components/shared/ErrorMessage';
+import TaskEditForm from '../components/TaskEditForm';
+import {
+  PageContainer, PageHeader, PageTitle, PageSubtitle,
+  Card, CardHeader, CardTitle, CardSubtle, CardBody, CardSection,
+  Button, IconButton, Badge, Checkbox, EmptyState, Select,
+  Composer, ComposerTitle, ComposerBody, ComposerToolbar, ComposerSpacer,
+  Chip, ChipGroup, GhostInput,
+} from '../components/ui/primitives';
+import {
+  IconTasks, IconPlus, IconPlay, IconStop, IconEdit, IconTrash,
+  IconGrip, IconClock, IconAlert, IconFilter, IconCheck, IconChevronDown, IconChevronRight,
+} from '../components/ui/icons';
 
-const PageContainer = styled.div`
-  width: 100%;
-`;
+const formatTime = (s: number) => {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+};
 
-const PageTitle = styled.h1`
-  font-size: 18px;
-  margin-bottom: 12px;
-  font-weight: 600;
-  color: #003087;
+const TaskRow = styled.div<{ $done?: boolean; $dragging?: boolean; $over?: boolean }>`
+  padding: var(--s-3) var(--s-5);
   display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  &:before {
-    content: '📋';
-    font-size: 20px;
-  }
+  gap: var(--s-3);
+  align-items: flex-start;
+  border-top: 1px solid var(--border-1);
+  background: ${p => p.$over ? 'var(--bg-3)' : 'transparent'};
+  opacity: ${p => p.$dragging ? 0.4 : 1};
+  transition: background 0.15s;
+
+  &:first-child { border-top: none; }
+  &:hover { background: var(--bg-3); }
 `;
 
-const Card = styled.div`
-  background: #fff;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  margin-bottom: 12px;
-  border-radius: 4px;
-  overflow: hidden;
-`;
-
-const CardHeader = styled.div<{ color?: string }>`
-  background: ${props => props.color || '#0a246a'};
-  color: white;
-  padding: 10px 15px;
-  font-weight: 600;
-  font-size: 13px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const CardBody = styled.div`
-  padding: 0;
-`;
-
-const TaskItem = styled.div<{ completed?: boolean; isDragging?: boolean; isDragOver?: boolean }>`
-  padding: 12px 15px;
-  border-bottom: 1px solid #e5e5e5;
-  display: flex;
-  gap: 12px;
-  background: ${props => {
-    if (props.isDragging) return '#e3f2fd';
-    if (props.isDragOver) return '#bbdefb';
-    if (props.completed) return '#fafafa';
-    return '#fff';
-  }};
-  opacity: ${props => props.isDragging ? 0.5 : 1};
-  transition: background 0.15s, opacity 0.15s;
-  
-  &:last-child {
-    border-bottom: none;
-  }
-  
-  &:hover {
-    background: ${props => props.completed ? '#f5f5f5' : '#f0f4ff'};
-  }
-`;
-
-const DragHandle = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  min-width: 24px;
+const Drag = styled.div`
+  color: var(--text-4);
   cursor: grab;
-  color: #aaa;
-  font-size: 16px;
-  user-select: none;
-  
-  &:hover {
-    color: #666;
-  }
-  
-  &:active {
-    cursor: grabbing;
-  }
-`;
-
-const Checkbox = styled.button<{ completed: boolean }>`
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  border: 2px solid ${props => props.completed ? '#28a745' : '#aaa'};
-  background: ${props => props.completed ? '#28a745' : '#fff'};
-  border-radius: 3px;
-  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  padding: 4px;
   margin-top: 2px;
-  transition: all 0.15s;
-  
-  &:after {
-    content: '${props => props.completed ? '✓' : ''}';
-    color: white;
-    font-size: 14px;
-    font-weight: bold;
-  }
-  
-  &:hover {
-    border-color: ${props => props.completed ? '#1e7e34' : '#007bff'};
-    background: ${props => props.completed ? '#1e7e34' : '#e8f4ff'};
-  }
+
+  &:hover { color: var(--text-2); }
+  &:active { cursor: grabbing; }
 `;
 
-const TaskContent = styled.div`
+const TaskBody = styled.div`
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 `;
 
-const TaskTitleRow = styled.div`
+const TitleRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
-  margin-bottom: 4px;
 `;
 
-const TaskTitle = styled.span<{ completed?: boolean }>`
-  font-weight: 600;
+const Title = styled.span<{ $done?: boolean }>`
+  font-weight: 500;
   font-size: 14px;
-  color: ${props => props.completed ? '#888' : '#1a1a1a'};
-  text-decoration: ${props => props.completed ? 'line-through' : 'none'};
+  color: ${p => p.$done ? 'var(--text-3)' : 'var(--text-1)'};
+  text-decoration: ${p => p.$done ? 'line-through' : 'none'};
 `;
 
-const Badge = styled.span<{ variant?: 'high' | 'medium' | 'low' | 'danger' | 'purple' }>`
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  background: ${props => {
-    switch (props.variant) {
-      case 'high': return '#dc3545';
-      case 'medium': return '#fd7e14';
-      case 'low': return '#28a745';
-      case 'danger': return '#dc3545';
-      case 'purple': return '#6f42c1';
-      default: return '#6c757d';
-    }
-  }};
-  color: white;
-`;
-
-const TaskDescription = styled.div`
+const Description = styled.div`
   font-size: 13px;
-  color: #555;
-  line-height: 1.6;
-  margin: 8px 0;
+  color: var(--text-2);
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 `;
 
-const TaskMeta = styled.div`
+const MetaRow = styled.div`
   display: flex;
-  align-items: center;
-  gap: 15px;
-  font-size: 12px;
-  color: #666;
-  margin-top: 8px;
+  gap: var(--s-4);
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+
+  span { display: flex; align-items: center; gap: 4px; }
+  svg { width: 12px; height: 12px; }
 `;
 
-const TaskActions = styled.div`
+const Actions = styled.div`
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-  align-items: flex-start;
-`;
-
-const Button = styled.button<{ variant?: 'primary' | 'danger' | 'secondary' }>`
-  padding: 6px 14px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: background 0.15s;
-  
-  background: ${props => {
-    switch (props.variant) {
-      case 'danger': return '#dc3545';
-      case 'secondary': return '#6c757d';
-      default: return '#007bff';
-    }
-  }};
-  color: white;
-  
-  &:hover {
-    background: ${props => {
-      switch (props.variant) {
-        case 'danger': return '#c82333';
-        case 'secondary': return '#5a6268';
-        default: return '#0056b3';
-      }
-    }};
-  }
-  
-  &:disabled {
-    background: #adb5bd;
-    cursor: not-allowed;
-  }
-`;
-
-const ToggleButton = styled.button`
-  padding: 4px 12px;
-  background: rgba(255,255,255,0.9);
-  color: #0a246a;
-  border: none;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  
-  &:hover {
-    background: #fff;
-  }
 `;
 
 const FilterBar = styled.div`
   display: flex;
-  gap: 30px;
-  margin-bottom: 12px;
-  padding: 12px 15px;
-  background: #fff;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  border-radius: 4px;
+  gap: var(--s-3);
   align-items: center;
+  padding: var(--s-3) var(--s-4);
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+
+  .label { font-size: 11px; text-transform: uppercase; color: var(--text-3); letter-spacing: 0.06em; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .label svg { width: 14px; height: 14px; }
 `;
 
-const FilterGroup = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
+const InlineSelect = styled(Select)`
+  width: auto;
+  min-width: 140px;
+  padding: 6px 28px 6px 10px;
+  font-size: 12px;
 `;
 
-const FilterLabel = styled.label`
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  white-space: nowrap;
-`;
-
-const FilterSelect = styled.select`
-  padding: 10px 15px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 14px;
-  background: #fff;
-  min-width: 150px;
-  height: 40px;
-  cursor: pointer;
-  
-  &:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.15);
-  }
-`;
-
-const EmptyState = styled.div`
-  padding: 40px 20px;
-  text-align: center;
-  color: #888;
-  font-size: 14px;
-`;
-
-const LoadMoreButton = styled(Button)`
-  width: 100%;
-  padding: 10px;
-  margin: 15px;
-  width: calc(100% - 30px);
-`;
+const priorityVariant = (p: 'low' | 'medium' | 'high') =>
+  p === 'high' ? 'danger' : p === 'medium' ? 'warning' : 'success';
 
 const Tasks: React.FC = () => {
-  const { 
-    tasks, 
-    addTask, 
-    updateTask, 
-    deleteTask, 
-    toggleTaskCompletion, 
-    reorderTasks,
-    startTimer, 
-    stopTimer, 
-    activeTaskId,
-    isLoading,
-    isAddingTask,
-    isDeletingTask,
-    isUpdatingTask,
-    isTogglingTask,
-    error
+  const {
+    tasks, addTask, updateTask, deleteTask, toggleTaskCompletion, reorderTasks,
+    startTimer, stopTimer, activeTaskId,
+    isLoading, isAddingTask, isDeletingTask, isUpdatingTask, isTogglingTask, error,
   } = useAppContext();
-  
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [dueDate, setDueDate] = useState('');
+  const [showDescription, setShowDescription] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
   const [timeFilter, setTimeFilter] = useState<'all' | 'overdue' | 'today' | 'upcoming'>('all');
-  const [completedTasksLimit, setCompletedTasksLimit] = useState(10);
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [showCompletedTasks, setShowCompletedTasks] = useState(true);
-  
-  // Drag and drop state
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
-  
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setPriority('medium');
-    setDueDate('');
+  const [completedLimit, setCompletedLimit] = useState(10);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(true);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  const reset = () => {
+    setTitle(''); setDescription(''); setPriority('medium'); setDueDate('');
+    setShowDescription(false);
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     addTask({
-      title,
-      description,
-      priority,
-      completed: false,
+      title, description, priority, completed: false,
       dueDate: dueDate ? new Date(dueDate) : undefined,
     });
-    resetForm();
+    reset();
   };
-  
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-  
-  const isOverdue = (task: any): boolean => {
-    return task.dueDate && !task.completed && isPast(new Date(task.dueDate));
-  };
-  
-  const handleEditTask = (taskId: string, updates: any) => {
-    updateTask(taskId, updates);
-    setEditingTaskId(null);
-  };
-  
-  const filterTasks = (taskList: any[]) => {
-    return taskList.filter(task => {
-      if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
-      
-      if (timeFilter !== 'all') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const taskDate = task.dueDate ? new Date(task.dueDate) : null;
 
-        switch (timeFilter) {
-          case 'overdue': return isOverdue(task);
-          case 'today':
-            if (!taskDate) return false;
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            return taskDate >= today && taskDate < tomorrow;
-          case 'upcoming':
-            if (!taskDate) return false;
-            return taskDate > new Date();
+  const isOverdue = (task: any) => task.dueDate && !task.completed && isPast(new Date(task.dueDate));
+
+  const filterTasks = (list: any[]) => list.filter(task => {
+    if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
+    if (timeFilter !== 'all') {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const taskDate = task.dueDate ? new Date(task.dueDate) : null;
+      switch (timeFilter) {
+        case 'overdue': return isOverdue(task);
+        case 'today': {
+          if (!taskDate) return false;
+          const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+          return taskDate >= today && taskDate < tomorrow;
         }
+        case 'upcoming':
+          if (!taskDate) return false;
+          return taskDate > new Date();
       }
-      return true;
-    });
-  };
-  
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    setDraggedTaskId(taskId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-  
-  const handleDragOver = (e: React.DragEvent, taskId: string) => {
+    }
+    return true;
+  });
+
+  const onDragStart = (e: React.DragEvent, id: string) => { setDraggedId(id); e.dataTransfer.effectAllowed = 'move'; };
+  const onDragOver = (e: React.DragEvent, id: string) => { e.preventDefault(); if (id !== draggedId) setOverId(id); };
+  const onDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    if (taskId !== draggedTaskId) {
-      setDragOverTaskId(taskId);
-    }
-  };
-  
-  const handleDragLeave = () => {
-    setDragOverTaskId(null);
-  };
-  
-  const handleDrop = (e: React.DragEvent, targetTaskId: string) => {
-    e.preventDefault();
-    
-    if (!draggedTaskId || draggedTaskId === targetTaskId) {
-      setDraggedTaskId(null);
-      setDragOverTaskId(null);
-      return;
-    }
-    
-    // Get incomplete tasks sorted by order
-    const incompleteTasksList = tasks
-      .filter(task => !task.completed)
-      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
-    
-    const draggedIndex = incompleteTasksList.findIndex(t => t.id === draggedTaskId);
-    const targetIndex = incompleteTasksList.findIndex(t => t.id === targetTaskId);
-    
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedTaskId(null);
-      setDragOverTaskId(null);
-      return;
-    }
-    
-    // Reorder the tasks
-    const newTasks = [...incompleteTasksList];
-    const [draggedTask] = newTasks.splice(draggedIndex, 1);
-    newTasks.splice(targetIndex, 0, draggedTask);
-    
-    // Update order values
-    const reorderedWithOrder = newTasks.map((task, index) => ({
-      ...task,
-      order: index
-    }));
-    
-    // Combine with completed tasks
-    const completedTasksList = tasks.filter(task => task.completed);
-    reorderTasks([...reorderedWithOrder, ...completedTasksList]);
-    
-    setDraggedTaskId(null);
-    setDragOverTaskId(null);
-  };
-  
-  const handleDragEnd = () => {
-    setDraggedTaskId(null);
-    setDragOverTaskId(null);
+    if (!draggedId || draggedId === targetId) { setDraggedId(null); setOverId(null); return; }
+    const list = tasks.filter(t => !t.completed).sort((a,b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+    const di = list.findIndex(t => t.id === draggedId);
+    const ti = list.findIndex(t => t.id === targetId);
+    if (di === -1 || ti === -1) { setDraggedId(null); setOverId(null); return; }
+    const next = [...list];
+    const [d] = next.splice(di, 1); next.splice(ti, 0, d);
+    const reordered = next.map((t, i) => ({ ...t, order: i }));
+    reorderTasks([...reordered, ...tasks.filter(t => t.completed)]);
+    setDraggedId(null); setOverId(null);
   };
 
-  // Sort incomplete tasks by order
   const incompleteTasks = filterTasks(
-    tasks
-      .filter(task => !task.completed)
-      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
+    tasks.filter(t => !t.completed).sort((a,b) => (a.order ?? Infinity) - (b.order ?? Infinity))
   );
-  const allCompletedTasks = tasks
-    .filter(task => task.completed)
-    .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime());
-  const completedTasks = allCompletedTasks.slice(0, completedTasksLimit);
-  
-  if (isLoading) return <LoadingState message="Loading tasks..." />;
-  if (error) return <ErrorMessage message={error} />;
-  
+  const allCompleted = tasks
+    .filter(t => t.completed)
+    .sort((a,b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime());
+  const completed = allCompleted.slice(0, completedLimit);
+
+  if (isLoading && tasks.length === 0) return <LoadingState message="Loading tasks…" />;
+  if (error && tasks.length === 0) return <ErrorMessage message={error} />;
+
   return (
     <PageContainer>
-      <PageTitle>Tasks</PageTitle>
-      
-      <Card>
-        <CardHeader color="linear-gradient(180deg, #495057, #343a40)">
-          ➕ Add New Task
-        </CardHeader>
-        <div style={{ padding: 15 }}>
-          <form onSubmit={handleSubmit}>
-            <FormRow>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter task title..."
-                required
-              />
-            </FormRow>
-            
-            <FormRow>
-              <Label htmlFor="description">Description</Label>
-              <TextArea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Add details or notes..."
-                rows={3}
-              />
-            </FormRow>
-            
-            <FormRowHorizontal>
-              <FormRow>
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  id="priority"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-                >
-                  <option value="low">🟢 Low</option>
-                  <option value="medium">🟠 Medium</option>
-                  <option value="high">🔴 High</option>
-                </Select>
-              </FormRow>
-              
-              <FormRow>
-                <Label htmlFor="dueDate">Due Date</Label>
-                <DateInput
-                  id="dueDate"
-                  type="datetime-local"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </FormRow>
-            </FormRowHorizontal>
-            
-            <ButtonRow>
-              <PrimaryButton type="submit" disabled={isAddingTask}>
-                {isAddingTask ? 'Adding...' : '+ Add Task'}
-              </PrimaryButton>
-              <SecondaryButton type="button" onClick={resetForm} disabled={isAddingTask}>
-                Clear
-              </SecondaryButton>
-            </ButtonRow>
-          </form>
+      <PageHeader>
+        <div>
+          <PageTitle><IconTasks /> Tasks</PageTitle>
+          <PageSubtitle>Plan, prioritize, and execute</PageSubtitle>
         </div>
-      </Card>
-      
+      </PageHeader>
+
+      <Composer onSubmit={submit}>
+        <ComposerTitle
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Add a task… ⌘ + Enter to save"
+          required
+          onKeyDown={e => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              e.preventDefault();
+              if (title.trim()) submit(e as any);
+            }
+          }}
+        />
+        {(showDescription || description) && (
+          <ComposerBody
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Add notes, links, context…"
+            rows={2}
+          />
+        )}
+        <ComposerToolbar>
+          <ChipGroup role="radiogroup" aria-label="Priority">
+            {(['low', 'medium', 'high'] as const).map(p => (
+              <Chip
+                key={p}
+                type="button"
+                $active={priority === p}
+                $tone={p === 'high' ? 'danger' : p === 'medium' ? 'warning' : 'success'}
+                onClick={() => setPriority(p)}
+                aria-pressed={priority === p}
+              >
+                {p[0].toUpperCase() + p.slice(1)}
+              </Chip>
+            ))}
+          </ChipGroup>
+
+          <GhostInput
+            type="datetime-local"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            aria-label="Due date"
+          />
+
+          <Chip
+            type="button"
+            $active={showDescription}
+            onClick={() => setShowDescription(s => !s)}
+          >
+            <IconEdit /> {showDescription ? 'Hide notes' : 'Add notes'}
+          </Chip>
+
+          <ComposerSpacer />
+
+          {(title || description || dueDate) && (
+            <Chip type="button" onClick={reset}>Clear</Chip>
+          )}
+          <Button $variant="primary" $size="sm" type="submit" disabled={isAddingTask || !title.trim()}>
+            {isAddingTask ? 'Adding…' : <><IconPlus /> Add task</>}
+          </Button>
+        </ComposerToolbar>
+      </Composer>
+
       <FilterBar>
-        <FilterGroup>
-          <FilterLabel>Priority:</FilterLabel>
-          <FilterSelect
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value as any)}
-          >
-            <option value="all">All</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </FilterSelect>
-        </FilterGroup>
-        
-        <FilterGroup>
-          <FilterLabel>Time:</FilterLabel>
-          <FilterSelect
-            value={timeFilter}
-            onChange={(e) => setTimeFilter(e.target.value as any)}
-          >
-            <option value="all">All</option>
-            <option value="overdue">Overdue</option>
-            <option value="today">Due Today</option>
-            <option value="upcoming">Upcoming</option>
-          </FilterSelect>
-        </FilterGroup>
+        <span className="label"><IconFilter /> Filter</span>
+        <InlineSelect value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}>
+          <option value="all">All priorities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </InlineSelect>
+        <InlineSelect value={timeFilter} onChange={e => setTimeFilter(e.target.value as any)}>
+          <option value="all">Any time</option>
+          <option value="overdue">Overdue</option>
+          <option value="today">Due today</option>
+          <option value="upcoming">Upcoming</option>
+        </InlineSelect>
       </FilterBar>
-      
+
       <Card>
         <CardHeader>
-          📋 Active Tasks ({incompleteTasks.length})
+          <CardTitle><IconTasks /> Active <CardSubtle>{incompleteTasks.length}</CardSubtle></CardTitle>
         </CardHeader>
         <CardBody>
           {incompleteTasks.length === 0 ? (
             <EmptyState>
-              {priorityFilter !== 'all' || timeFilter !== 'all' 
-                ? '🔍 No tasks match your filters' 
-                : '🎉 All tasks completed!'}
+              <IconCheck />
+              <div>{(priorityFilter !== 'all' || timeFilter !== 'all') ? 'No tasks match your filters.' : 'All clear. Add your first task above.'}</div>
             </EmptyState>
-          ) : (
-            incompleteTasks.map(task => (
-              <React.Fragment key={task.id}>
-                {editingTaskId === task.id ? (
-                  <TaskEditForm 
-                    task={task} 
-                    onSave={handleEditTask}
-                    onCancel={() => setEditingTaskId(null)}
-                    isLoading={isUpdatingTask}
-                  />
-                ) : (
-                  <TaskItem
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, task.id)}
-                    onDragOver={(e) => handleDragOver(e, task.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, task.id)}
-                    onDragEnd={handleDragEnd}
-                    isDragging={draggedTaskId === task.id}
-                    isDragOver={dragOverTaskId === task.id}
-                  >
-                    <DragHandle title="Drag to reorder">
-                      ⋮⋮
-                    </DragHandle>
-                    
-                    <Checkbox
-                      completed={false}
-                      onClick={() => toggleTaskCompletion(task.id)}
-                      disabled={isTogglingTask}
-                    />
-                    
-                    <TaskContent>
-                      <TaskTitleRow>
-                        <TaskTitle>{task.title}</TaskTitle>
-                        <Badge variant={task.priority}>{task.priority}</Badge>
-                        {isOverdue(task) && <Badge variant="danger">OVERDUE</Badge>}
-                        {task.convertedFromReminder && <Badge variant="purple">FROM REMINDER</Badge>}
-                      </TaskTitleRow>
-                      
-                      {task.description && (
-                        <TaskDescription>
-                          <LinkifyText text={task.description} />
-                        </TaskDescription>
-                      )}
-                      
-                      <TaskMeta>
-                        {task.dueDate && <span>📅 {format(new Date(task.dueDate), 'MMM d, h:mm a')}</span>}
-                        {task.timeSpent > 0 && <span>⏱ {formatTime(task.timeSpent)}</span>}
-                      </TaskMeta>
-                    </TaskContent>
-                    
-                    <TaskActions>
-                      {task.id === activeTaskId ? (
-                        <Button variant="danger" onClick={() => stopTimer(task.id)} disabled={isUpdatingTask}>
-                          ⏹ Stop
-                        </Button>
-                      ) : (
-                        <Button onClick={() => startTimer(task.id)} disabled={!!activeTaskId || isUpdatingTask}>
-                          ▶ Start
-                        </Button>
-                      )}
-                      {!task.convertedFromReminder && (
-                        <Button variant="secondary" onClick={() => setEditingTaskId(task.id)} disabled={isUpdatingTask}>
-                          ✎ Edit
-                        </Button>
-                      )}
-                      <Button variant="danger" onClick={() => deleteTask(task.id)} disabled={isDeletingTask}>
-                        ✕
+          ) : incompleteTasks.map(task => (
+            <React.Fragment key={task.id}>
+              {editingId === task.id ? (
+                <TaskEditForm task={task} onSave={(id, u) => { updateTask(id, u); setEditingId(null); }} onCancel={() => setEditingId(null)} isLoading={isUpdatingTask} />
+              ) : (
+                <TaskRow
+                  draggable
+                  onDragStart={e => onDragStart(e, task.id)}
+                  onDragOver={e => onDragOver(e, task.id)}
+                  onDragLeave={() => setOverId(null)}
+                  onDrop={e => onDrop(e, task.id)}
+                  onDragEnd={() => { setDraggedId(null); setOverId(null); }}
+                  $dragging={draggedId === task.id}
+                  $over={overId === task.id}
+                >
+                  <Drag title="Drag to reorder"><IconGrip /></Drag>
+                  <Checkbox $checked={false} onClick={() => toggleTaskCompletion(task.id)} disabled={isTogglingTask} style={{ marginTop: 3 }} />
+                  <TaskBody>
+                    <TitleRow>
+                      <Title>{task.title}</Title>
+                      <Badge $variant={priorityVariant(task.priority)}>{task.priority}</Badge>
+                      {isOverdue(task) && <Badge $variant="danger"><IconAlert /> Overdue</Badge>}
+                      {task.convertedFromReminder && <Badge $variant="purple">From reminder</Badge>}
+                    </TitleRow>
+                    {task.description && <Description><LinkifyText text={task.description} /></Description>}
+                    {(task.dueDate || task.timeSpent > 0) && (
+                      <MetaRow>
+                        {task.dueDate && <span><IconClock /> {format(new Date(task.dueDate), 'MMM d · HH:mm')}</span>}
+                        {task.timeSpent > 0 && <span><IconClock /> {formatTime(task.timeSpent)}</span>}
+                      </MetaRow>
+                    )}
+                  </TaskBody>
+                  <Actions>
+                    {task.id === activeTaskId ? (
+                      <Button $variant="danger" $size="sm" onClick={() => stopTimer(task.id)} disabled={isUpdatingTask}>
+                        <IconStop /> Stop
                       </Button>
-                    </TaskActions>
-                  </TaskItem>
-                )}
-              </React.Fragment>
-            ))
-          )}
+                    ) : (
+                      <Button $variant="success" $size="sm" onClick={() => startTimer(task.id)} disabled={!!activeTaskId || isUpdatingTask}>
+                        <IconPlay /> Start
+                      </Button>
+                    )}
+                    {!task.convertedFromReminder && (
+                      <IconButton $size="sm" onClick={() => setEditingId(task.id)} disabled={isUpdatingTask} title="Edit">
+                        <IconEdit />
+                      </IconButton>
+                    )}
+                    <IconButton $size="sm" $variant="danger" onClick={() => deleteTask(task.id)} disabled={isDeletingTask} title="Delete">
+                      <IconTrash />
+                    </IconButton>
+                  </Actions>
+                </TaskRow>
+              )}
+            </React.Fragment>
+          ))}
         </CardBody>
       </Card>
-      
-      {allCompletedTasks.length > 0 && (
+
+      {allCompleted.length > 0 && (
         <Card>
-          <CardHeader color="linear-gradient(180deg, #6c757d, #545b62)">
-            <span>✅ Completed Tasks ({allCompletedTasks.length})</span>
-            <ToggleButton onClick={() => setShowCompletedTasks(!showCompletedTasks)}>
-              {showCompletedTasks ? 'Hide' : 'Show'}
-            </ToggleButton>
+          <CardHeader>
+            <CardTitle><IconCheck /> Completed <CardSubtle>{allCompleted.length}</CardSubtle></CardTitle>
+            <Button $variant="ghost" $size="sm" onClick={() => setShowCompleted(s => !s)}>
+              {showCompleted ? <IconChevronDown /> : <IconChevronRight />}
+              {showCompleted ? 'Hide' : 'Show'}
+            </Button>
           </CardHeader>
-          
-          {showCompletedTasks && (
+          {showCompleted && (
             <CardBody>
-              {completedTasks.map(task => (
-                <TaskItem key={task.id} completed>
-                  <Checkbox
-                    completed={true}
-                    onClick={() => toggleTaskCompletion(task.id)}
-                  />
-                  
-                  <TaskContent>
-                    <TaskTitleRow>
-                      <TaskTitle completed>{task.title}</TaskTitle>
-                      <Badge variant={task.priority}>{task.priority}</Badge>
-                    </TaskTitleRow>
-                    
-                    {task.description && (
-                      <TaskDescription style={{ color: '#999' }}>
-                        <LinkifyText text={task.description} />
-                      </TaskDescription>
-                    )}
-                    
-                    <TaskMeta>
-                      {task.timeSpent > 0 && <span>⏱ {formatTime(task.timeSpent)}</span>}
+              {completed.map(task => (
+                <TaskRow key={task.id} $done>
+                  <div style={{ width: 22 }} />
+                  <Checkbox $checked={true} onClick={() => toggleTaskCompletion(task.id)} style={{ marginTop: 3 }} />
+                  <TaskBody>
+                    <TitleRow>
+                      <Title $done>{task.title}</Title>
+                      <Badge $variant={priorityVariant(task.priority)}>{task.priority}</Badge>
+                    </TitleRow>
+                    {task.description && <Description><LinkifyText text={task.description} /></Description>}
+                    <MetaRow>
+                      {task.timeSpent > 0 && <span><IconClock /> {formatTime(task.timeSpent)}</span>}
                       <span>Completed {format(new Date(task.completedAt || task.createdAt), 'MMM d')}</span>
-                    </TaskMeta>
-                  </TaskContent>
-                  
-                  <TaskActions>
-                    <Button variant="danger" onClick={() => deleteTask(task.id)}>
-                      ✕
-                    </Button>
-                  </TaskActions>
-                </TaskItem>
+                    </MetaRow>
+                  </TaskBody>
+                  <Actions>
+                    <IconButton $size="sm" $variant="danger" onClick={() => deleteTask(task.id)} title="Delete">
+                      <IconTrash />
+                    </IconButton>
+                  </Actions>
+                </TaskRow>
               ))}
-              
-              {completedTasksLimit < allCompletedTasks.length && (
-                <LoadMoreButton onClick={() => setCompletedTasksLimit(prev => prev + 10)}>
-                  Load More ({allCompletedTasks.length - completedTasksLimit} remaining)
-                </LoadMoreButton>
+              {completedLimit < allCompleted.length && (
+                <CardSection>
+                  <Button $block $variant="ghost" onClick={() => setCompletedLimit(p => p + 10)}>
+                    Load more · {allCompleted.length - completedLimit} remaining
+                  </Button>
+                </CardSection>
               )}
             </CardBody>
           )}

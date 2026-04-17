@@ -1,78 +1,47 @@
 import React from 'react';
 import styled from 'styled-components';
+import { Button } from '../ui/primitives';
+import { IconAlert } from '../ui/icons';
 
-interface ErrorMessageProps {
+interface Props {
   message: string;
   onRetry?: () => void;
 }
 
-const ErrorContainer = styled.div`
+const Wrap = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px;
-  margin: 20px 0;
-  background-color: #fff;
-  border: 1px solid #dfdfdf;
-  border-radius: 4px;
-  box-shadow: inset 1px 1px 0px 1px #ffffff, inset -1px -1px 0px 1px #888888;
-`;
-
-const ErrorIcon = styled.div`
-  width: 48px;
-  height: 48px;
-  background-color: #ff0000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: bold;
-  font-size: 32px;
-  margin-bottom: 16px;
-`;
-
-const ErrorTitle = styled.div`
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #cc0000;
-  margin-bottom: 8px;
-`;
-
-const ErrorText = styled.div`
-  font-size: 1rem;
-  color: #333;
+  gap: var(--s-3);
+  padding: var(--s-7);
+  background: var(--bg-2);
+  border: 1px solid var(--danger-soft);
+  border-radius: var(--r-lg);
   text-align: center;
-  margin-bottom: 16px;
 `;
 
-const RetryButton = styled.button`
-  padding: 8px 20px;
-  background: linear-gradient(to bottom, #4f94ea, #3a7bd5);
-  color: white;
-  border: 1px solid #2c5ea9;
-  border-radius: 3px;
-  font-size: 1rem;
-  cursor: pointer;
-  
-  &:hover {
-    background: linear-gradient(to bottom, #5ca0ff, #4485e6);
-  }
-  
-  &:active {
-    background: #3a7bd5;
-  }
+const Icon = styled.div`
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+
+  svg { width: 24px; height: 24px; }
 `;
 
-const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, onRetry }) => {
-  return (
-    <ErrorContainer>
-      <ErrorIcon>!</ErrorIcon>
-      <ErrorTitle>Error</ErrorTitle>
-      <ErrorText>{message}</ErrorText>
-      {onRetry && <RetryButton onClick={onRetry}>Retry</RetryButton>}
-    </ErrorContainer>
-  );
-};
+const Title = styled.div` font-size: 14px; font-weight: 600; color: var(--text-1); `;
+const Text = styled.div` font-size: 13px; color: var(--text-2); max-width: 420px; `;
 
-export default ErrorMessage; 
+const ErrorMessage: React.FC<Props> = ({ message, onRetry }) => (
+  <Wrap>
+    <Icon><IconAlert /></Icon>
+    <Title>Something went wrong</Title>
+    <Text>{message}</Text>
+    {onRetry && <Button $variant="primary" onClick={onRetry}>Retry</Button>}
+  </Wrap>
+);
+
+export default ErrorMessage;

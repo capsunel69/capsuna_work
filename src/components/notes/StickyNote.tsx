@@ -1,216 +1,126 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { v4 as uuidv4 } from 'uuid';
 import DOMPurify from 'dompurify';
+import { ModalOverlay, IconButton, Button, Spinner } from '../ui/primitives';
+import { IconX, IconEdit, IconNote, IconCheck } from '../ui/icons';
 
-// Modal overlay with darkened background
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 20px;
-`;
-
-const StickyNoteContainer = styled.div<{ width: number; height: number }>`
+const Container = styled.div<{ $w: number; $h: number }>`
   position: relative;
-  width: ${props => props.width}px;
-  min-width: 300px;
-  max-width: 90vw;
-  height: ${props => props.height}px;
-  min-height: 400px;
-  max-height: 80vh;
-  background: #ffd700;
-  padding: 0;
-  box-shadow: 
-    2px 2px 10px rgba(0, 0, 0, 0.2),
-    0 0 40px rgba(0, 0, 0, 0.1);
-  font-family: 'Share Tech Mono', monospace;
+  width: ${p => p.$w}px;
+  height: ${p => p.$h}px;
+  min-width: 320px;
+  min-height: 320px;
+  max-width: 92vw;
+  max-height: 86vh;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  transform-origin: center center;
-  resize: both;
   overflow: hidden;
-  
-  &:active {
-    box-shadow: 
-      4px 4px 15px rgba(0, 0, 0, 0.3),
-      0 0 40px rgba(0, 0, 0, 0.1);
-  }
 `;
 
-const DragHandle = styled.div`
-  width: 100%;
-  height: 30px;
-  background: rgba(0, 0, 0, 0.03);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  position: relative;
+const Header = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border-1);
 
-  &:before {
-    content: '● ● ●';
-    position: absolute;
-    left: 10px;
-    top: 5px;
-    color: rgba(0, 0, 0, 0.3);
-    font-size: 12px;
+  .title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
   }
+
+  .title svg { width: 16px; height: 16px; color: var(--accent); }
 `;
 
-const NoteContentWrapper = styled.div`
-  padding: 20px;
+const Body = styled.div`
+  flex: 1;
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
-  gap: 10px;
-  height: calc(100% - 30px);
-  overflow: auto;
+  padding: var(--s-4);
+  gap: var(--s-3);
+  overflow: hidden;
 `;
 
-const NoteContent = styled.div`
+const Display = styled.div`
   flex: 1;
-  font-size: 1rem;
-  color: #333;
+  overflow: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  padding: var(--s-4);
+  font-size: 14px;
+  color: var(--text-1);
+  line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
-  line-height: 1.4;
-  margin-top: 10px;
-  margin-bottom: 10px;
   cursor: text;
-  user-select: text;
-  overflow-y: auto;
-  
+
   a {
-    color: #0000EE;
+    color: var(--accent);
     text-decoration: underline;
-    cursor: pointer;
-    
-    &:hover {
-      color: #551A8B;
-    }
-    
-    &:visited {
-      color: #551A8B;
-    }
+  }
+  a:hover { color: var(--accent-strong); }
+
+  &:empty:before {
+    content: 'No content yet — click to start writing.';
+    color: var(--text-3);
+    font-style: italic;
   }
 `;
 
-const NoteTextArea = styled.textarea`
-  width: 100%;
+const TextArea = styled.textarea`
   flex: 1;
-  min-height: 200px;
-  background: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  padding: 8px;
-  font-family: inherit;
-  font-size: 1rem;
+  width: 100%;
+  background: var(--bg-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  padding: var(--s-4);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-1);
   resize: none;
-  margin-bottom: 10px;
-  line-height: 1.4;
-  cursor: text;
-  
-  &:focus {
-    outline: none;
-    border-color: rgba(0, 0, 0, 0.4);
-    background: rgba(255, 255, 255, 0.1);
-  }
+  line-height: 1.6;
+
+  &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 `;
 
-const ButtonContainer = styled.div`
+const Footer = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-top: auto;
-`;
-
-const SaveButton = styled.button`
-  padding: 6px 12px;
-  background: linear-gradient(to bottom, #4f94ea, #3a7bd5);
-  color: white;
-  border: 1px solid #2c5ea9;
-  border-radius: 3px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  
-  &:hover {
-    background: linear-gradient(to bottom, #5ca0ff, #4485e6);
-  }
-  
-  &:active {
-    background: #3a7bd5;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
-  }
-`;
-
-const EditButton = styled.button`
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  font-family: inherit;
-  z-index: 1;
-  
-  &:hover {
-    background: rgba(255, 255, 255, 0.6);
-  }
+  justify-content: flex-end;
+  gap: var(--s-2);
 `;
 
 const ResizeHandle = styled.div`
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   cursor: nwse-resize;
-  background: rgba(0, 0, 0, 0.05);
-  z-index: 10;
-  
+
   &:before {
     content: '';
     position: absolute;
-    right: 3px;
-    bottom: 3px;
-    width: 5px;
-    height: 5px;
-    border-right: 2px solid rgba(0, 0, 0, 0.3);
-    border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+    right: 4px;
+    bottom: 4px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--text-4);
+    border-bottom: 2px solid var(--text-4);
+    border-radius: 1px;
   }
-  
-  &:hover {
-    background: rgba(0, 0, 0, 0.1);
-  }
-`;
 
-const CloseButton = styled.button`
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: none;
-  border: none;
-  color: #000;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  z-index: 10;
-  
-  &:hover {
-    background-color: #ff0000;
-    color: white;
-  }
+  &:hover:before { border-color: var(--text-2); }
 `;
 
 interface Note {
@@ -219,215 +129,120 @@ interface Note {
   updatedAt: Date;
 }
 
-interface Size {
-  width: number;
-  height: number;
-}
-
-interface StickyNoteProps {
+interface Props {
   onClose: () => void;
 }
 
-const StickyNote: React.FC<StickyNoteProps> = ({ onClose }) => {
+const linkify = (text: string) => {
+  const re = /(https?:\/\/[^\s]+)/g;
+  return text.replace(re, url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
+};
+
+const StickyNote: React.FC<Props> = ({ onClose }) => {
   const [note, setNote] = useState<Note | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [content, setContent] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [size, setSize] = useState<Size>({ width: 600, height: 700 });
-  const [isResizing, setIsResizing] = useState(false);
-  const nodeRef = useRef<HTMLDivElement>(null);
-  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [size, setSize] = useState({ w: 600, h: 600 });
+  const startRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
 
-  // Function to convert URLs to clickable links
-  const convertLinksToHtml = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
-  };
-
-  // Fetch note - only once on component mount
-  const fetchNote = useCallback(async () => {
-    try {
-      const response = await fetch('/.netlify/functions/notes');
-      const data = await response.json();
-      if (data && data.id) {
-        setNote(data);
-        setContent(data.content || '');
-      }
-    } catch (error) {
-      console.error('Error fetching note:', error);
-    }
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/.netlify/functions/notes');
+        const d = await r.json();
+        if (d?.id) { setNote(d); setContent(d.content || ''); }
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    })();
   }, []);
 
   useEffect(() => {
-    fetchNote();
-  }, [fetchNote]);
-
-  // Handle escape key to close modal
-  useEffect(() => {
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscapeKey);
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKey);
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Handle clicking on overlay to close modal
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  // Handle resize start
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (nodeRef.current) {
-      setIsResizing(true);
-      resizeStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        width: size.width,
-        height: size.height
-      };
-      
-      // Add document-level event listeners
-      document.addEventListener('mousemove', handleResizeMove);
-      document.addEventListener('mouseup', handleResizeEnd);
-    }
-  };
-  
-  // Handle resize move
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (isResizing && resizeStartRef.current) {
-      const start = resizeStartRef.current;
-      const newWidth = Math.max(250, start.width + (e.clientX - start.x));
-      const newHeight = Math.max(200, start.height + (e.clientY - start.y));
-      setSize({ width: newWidth, height: newHeight });
-    }
-  }, [isResizing]);
-  
-  // Handle resize end
-  const handleResizeEnd = useCallback(() => {
-    setIsResizing(false);
-    resizeStartRef.current = null;
-    
-    // Remove document-level event listeners
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-  }, [handleResizeMove]);
-  
-  // Clean up event listeners on unmount
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleResizeMove);
-      document.removeEventListener('mouseup', handleResizeEnd);
-    };
-  }, [handleResizeMove, handleResizeEnd]);
-
-  // Save note
-  const handleSave = async () => {
+  const save = async () => {
+    setSaving(true);
     try {
-      setIsSaving(true);
-      const noteData = {
-        id: note?.id || uuidv4(),
-        content,
-        updatedAt: new Date()
-      };
-
-      const response = await fetch('/.netlify/functions/notes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(noteData),
+      const data = { id: note?.id || uuidv4(), content, updatedAt: new Date() };
+      const r = await fetch('/.netlify/functions/notes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       });
-
-      if (response.ok) {
-        const savedNote = await response.json();
-        setNote(savedNote);
-        setIsEditing(false);
+      if (r.ok) {
+        const saved = await r.json();
+        setNote(saved);
+        setEditing(false);
       }
-    } catch (error) {
-      console.error('Error saving note:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
   };
 
-  // Prevent text selection propagation
-  const handleContentMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  // Handle clicking on note content to enter edit mode
-  const handleContentClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    // Don't enter edit mode if clicking on a link
-    const target = e.target as HTMLElement;
-    if (target.tagName.toLowerCase() === 'a') {
-      return;
-    }
-    
-    // Enter edit mode when clicking on the text content
-    setIsEditing(true);
+  const onMove = useCallback((e: MouseEvent) => {
+    if (!startRef.current) return;
+    const s = startRef.current;
+    setSize({ w: Math.max(320, s.w + (e.clientX - s.x)), h: Math.max(320, s.h + (e.clientY - s.y)) });
+  }, []);
+  const onUp = useCallback(() => {
+    startRef.current = null;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }, [onMove]);
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    startRef.current = { x: e.clientX, y: e.clientY, w: size.w, h: size.h };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   };
 
   return (
-    <ModalOverlay onClick={handleOverlayClick}>
-      <StickyNoteContainer ref={nodeRef} width={size.width} height={size.height}>
-        <DragHandle>
-          <CloseButton onClick={onClose}>×</CloseButton>
-        </DragHandle>
-        <NoteContentWrapper>
-          {isEditing ? (
+    <ModalOverlay onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <Container $w={size.w} $h={size.h} onClick={e => e.stopPropagation()}>
+        <Header>
+          <span className="title"><IconNote /> Notes</span>
+          <IconButton $variant="ghost" $size="sm" onClick={onClose}><IconX /></IconButton>
+        </Header>
+        <Body>
+          {loading ? (
+            <div style={{ display: 'grid', placeItems: 'center', flex: 1 }}><Spinner $size={24} /></div>
+          ) : editing ? (
             <>
-              <NoteTextArea
+              <TextArea
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Type your note here..."
+                onChange={e => setContent(e.target.value)}
+                placeholder="Type freely. Markdown-friendly URLs become links."
                 autoFocus
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={handleContentMouseDown}
               />
-              <SaveButton onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Note'}
-              </SaveButton>
+              <Footer>
+                <Button $variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                <Button $variant="primary" onClick={save} disabled={saving}>
+                  {saving ? 'Saving…' : <><IconCheck /> Save</>}
+                </Button>
+              </Footer>
             </>
           ) : (
             <>
-              <NoteContent
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(convertLinksToHtml(note?.content || ''))
+              <Display
+                onClick={(e) => {
+                  const t = e.target as HTMLElement;
+                  if (t.tagName.toLowerCase() === 'a') return;
+                  setEditing(true);
                 }}
-                onClick={handleContentClick}
-                onMouseDown={handleContentMouseDown}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(linkify(note?.content || '')) }}
               />
-              <ButtonContainer>
-                <EditButton 
-                  onClick={() => setIsEditing(true)}
-                  onMouseDown={handleContentMouseDown}
-                >
-                  Edit Note
-                </EditButton>
-              </ButtonContainer>
+              <Footer>
+                <Button $variant="secondary" onClick={() => setEditing(true)}><IconEdit /> Edit</Button>
+              </Footer>
             </>
           )}
-        </NoteContentWrapper>
-        <ResizeHandle 
-          onMouseDown={handleResizeStart}
-          onClick={(e) => e.stopPropagation()}
-        />
-      </StickyNoteContainer>
+        </Body>
+        <ResizeHandle onMouseDown={startResize} />
+      </Container>
     </ModalOverlay>
   );
 };
 
-export default StickyNote; 
+export default StickyNote;

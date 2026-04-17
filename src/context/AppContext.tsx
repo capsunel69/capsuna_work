@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { isSameDay } from 'date-fns';
 import type { Task, Meeting, Reminder, TimerSession, Journal } from '../types';
 import { TasksAPI, MeetingsAPI, RemindersAPI, JournalsAPI } from '../services/api';
+import { useToast } from '../components/ui/Toast';
 
 interface AppContextType {
   // Tasks
@@ -67,18 +68,18 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Get data from localStorage (fallback if API fails)
+// Read cached value from localStorage (synchronous; used for instant hydration)
 const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
   try {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
+    return item ? (JSON.parse(item) as T) : defaultValue;
   } catch (error) {
     console.error(`Error loading ${key} from localStorage`, error);
     return defaultValue;
   }
 };
 
-// Save data to localStorage
+// Write to localStorage (always – including empty arrays so deletions persist)
 const saveToLocalStorage = <T,>(key: string, value: T): void => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -87,15 +88,40 @@ const saveToLocalStorage = <T,>(key: string, value: T): void => {
   }
 };
 
+// Cache keys
+const CK = {
+  tasks: 'tasks',
+  meetings: 'meetings',
+  reminders: 'reminders',
+  journals: 'journals',
+} as const;
+
+// Lightweight equality check for the reminder cleanup so we only PUT when something
+// actually changed (avoids spamming the API on every page load).
+const sameStringSet = (a: string[] = [], b: string[] = []): boolean => {
+  if (a.length !== b.length) return false;
+  const sa = new Set(a);
+  for (const v of b) if (!sa.has(v)) return false;
+  return true;
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State for tasks, meetings, reminders
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]); 
-  const [journals, setJournals] = useState<Journal[]>([]);
-  
-  // Loading and error states
-  const [isLoading, setIsLoading] = useState(true);
+  // Hydrate synchronously from localStorage so the UI renders instantly with cached data.
+  // The API refresh below silently replaces the data once the network responds.
+  const cachedTasks = loadFromLocalStorage<Task[]>(CK.tasks, []);
+  const cachedMeetings = loadFromLocalStorage<Meeting[]>(CK.meetings, []);
+  const cachedReminders = loadFromLocalStorage<Reminder[]>(CK.reminders, []);
+  const cachedJournals = loadFromLocalStorage<Journal[]>(CK.journals, []);
+
+  const [tasks, setTasks] = useState<Task[]>(cachedTasks);
+  const [meetings, setMeetings] = useState<Meeting[]>(cachedMeetings);
+  const [reminders, setReminders] = useState<Reminder[]>(cachedReminders);
+  const [journals, setJournals] = useState<Journal[]>(cachedJournals);
+
+  // Only show the full-screen loader on the very first load (no cache yet).
+  const hasCache =
+    cachedTasks.length + cachedMeetings.length + cachedReminders.length + cachedJournals.length > 0;
+  const [isLoading, setIsLoading] = useState(!hasCache);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [isDeletingTask, setIsDeletingTask] = useState(false);
   const [isUpdatingTask, setIsUpdatingTask] = useState(false);
@@ -117,98 +143,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Journal PIN verification state
   const [isJournalPinVerified, setJournalPinVerified] = useState(false);
 
-  // Load data from API on mount
+  // Toasts
+  const toast = useToast();
+
+  // Load fresh data from the API. We render cached data immediately and
+  // swap in fresh data when the network responds. Reminder cleanup runs
+  // in the background and only writes back what actually changed.
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
+    let cancelled = false;
+
+    const refresh = async () => {
       setError(null);
-      
       try {
-        // Fetch tasks, meetings, and reminders in parallel
         const [tasksData, meetingsData, remindersData, journalsData] = await Promise.all([
           TasksAPI.getAll(),
           MeetingsAPI.getAll(),
           RemindersAPI.getAll(),
-          JournalsAPI.getAll()
+          JournalsAPI.getAll(),
         ]);
-        
-        // Clean up any stale reminder conversion states by checking against actual tasks
-        const cleanedReminders = remindersData.map(reminder => {
-          if (reminder.recurring) {
-            // For recurring reminders, only keep convertedToTaskDates that have corresponding tasks
-            const validDates = (reminder.convertedToTaskDates || []).filter(date => {
-              const convertedDate = new Date(date);
-              convertedDate.setHours(0, 0, 0, 0);
-              // Check if there's a task for this reminder on this date
-              return tasksData.some(task => 
-                task.convertedFromReminder === reminder.id && 
-                isSameDay(new Date(task.createdAt), convertedDate)
-              );
-            });
-            
-            return {
-              ...reminder,
-              convertedToTaskDates: validDates
-            };
-          } else {
-            // For non-recurring reminders, check if the task still exists
-            const hasAssociatedTask = tasksData.some(task => 
-              task.convertedFromReminder === reminder.id
-            );
-            
-            return {
-              ...reminder,
-              convertedToTask: hasAssociatedTask
-            };
-          }
-        });
+        if (cancelled) return;
 
-        // Update the cleaned reminders in the database
-        await Promise.all(cleanedReminders.map(reminder => 
-          RemindersAPI.update(reminder.id, 
-            reminder.recurring 
-              ? { convertedToTaskDates: reminder.convertedToTaskDates }
-              : { convertedToTask: reminder.convertedToTask }
-          )
-        ));
-        
         setTasks(tasksData);
         setMeetings(meetingsData);
-        setReminders(cleanedReminders); // Use the cleaned reminders
+        setReminders(remindersData);
         setJournals(journalsData);
+
+        // Reconcile reminder ↔ task conversion state in the background.
+        // Only PUT reminders whose state actually changed.
+        void reconcileReminders(remindersData, tasksData).then((fixed) => {
+          if (!cancelled && fixed) setReminders(fixed);
+        });
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Failed to load data. Using local data instead.');
-        
-        // Fall back to localStorage if API fails
-        setTasks(loadFromLocalStorage('tasks', []));
-        setMeetings(loadFromLocalStorage('meetings', []));
-        setReminders(loadFromLocalStorage('reminders', []));
-        setJournals(loadFromLocalStorage('journals', []));
+        if (!cancelled && !hasCache) {
+          setError('Failed to load data.');
+        }
+        // If we have cached data we silently keep it — no need to alarm the user.
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
-    
-    fetchData();
+
+    refresh();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save to localStorage as backup
-  useEffect(() => {
-    if (tasks.length > 0) saveToLocalStorage('tasks', tasks);
-  }, [tasks]);
+  // Reconcile reminder conversion state against actual tasks. Returns the
+  // updated reminder list only if something changed; otherwise null.
+  const reconcileReminders = async (
+    remindersData: Reminder[],
+    tasksData: Task[],
+  ): Promise<Reminder[] | null> => {
+    const writes: Promise<unknown>[] = [];
+    let dirty = false;
 
-  useEffect(() => {
-    if (meetings.length > 0) saveToLocalStorage('meetings', meetings);
-  }, [meetings]);
+    const next = remindersData.map((reminder) => {
+      if (reminder.recurring) {
+        const validDates = (reminder.convertedToTaskDates || []).filter((date) => {
+          const convertedDate = new Date(date);
+          convertedDate.setHours(0, 0, 0, 0);
+          return tasksData.some(
+            (task) =>
+              task.convertedFromReminder === reminder.id &&
+              isSameDay(new Date(task.createdAt), convertedDate),
+          );
+        });
 
-  useEffect(() => {
-    if (reminders.length > 0) saveToLocalStorage('reminders', reminders);
-  }, [reminders]);
+        if (!sameStringSet(validDates, reminder.convertedToTaskDates || [])) {
+          dirty = true;
+          writes.push(
+            RemindersAPI.update(reminder.id, { convertedToTaskDates: validDates }).catch((e) =>
+              console.warn('reminder reconcile failed', e),
+            ),
+          );
+          return { ...reminder, convertedToTaskDates: validDates };
+        }
+        return reminder;
+      }
 
-  useEffect(() => {
-    if (journals.length > 0) saveToLocalStorage('journals', journals);
-  }, [journals]);
+      const hasAssociatedTask = tasksData.some((t) => t.convertedFromReminder === reminder.id);
+      if (hasAssociatedTask !== !!reminder.convertedToTask) {
+        dirty = true;
+        writes.push(
+          RemindersAPI.update(reminder.id, { convertedToTask: hasAssociatedTask }).catch((e) =>
+            console.warn('reminder reconcile failed', e),
+          ),
+        );
+        return { ...reminder, convertedToTask: hasAssociatedTask };
+      }
+      return reminder;
+    });
+
+    if (!dirty) return null;
+    void Promise.all(writes);
+    return next;
+  };
+
+  // Persist every change to localStorage (including empty arrays so deletions survive reloads)
+  useEffect(() => { saveToLocalStorage(CK.tasks, tasks); }, [tasks]);
+  useEffect(() => { saveToLocalStorage(CK.meetings, meetings); }, [meetings]);
+  useEffect(() => { saveToLocalStorage(CK.reminders, reminders); }, [reminders]);
+  useEffect(() => { saveToLocalStorage(CK.journals, journals); }, [journals]);
   
   // Clean up timer interval when component unmounts
   useEffect(() => {
@@ -270,13 +308,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const newTask = await TasksAPI.create(task);
       setTasks(prev => [...prev, newTask]);
+      toast.success('Task created', newTask.title);
     } catch (err) {
       console.error('Error adding task:', err);
       setError('Failed to add task');
+      toast.error('Could not create task', 'Please try again');
     } finally {
       setIsAddingTask(false);
     }
-  }, []);
+  }, [toast]);
 
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     setIsUpdatingTask(true);
@@ -308,8 +348,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       await TasksAPI.delete(taskId);
-      setTasks(prev => prev.filter(task => task.id !== taskId));
-      
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      toast.success('Task deleted', task.title);
+
       // If this task was converted from a reminder, update the reminder's state
       if (task.convertedFromReminder) {
         const reminder = reminders.find(r => r.id === task.convertedFromReminder);
@@ -341,13 +382,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.error('Error deleting task:', err);
       setError('Failed to delete task');
-      
-      // Delete from local state even if API fails
-      setTasks(prev => prev.filter(task => task.id !== taskId));
+      toast.error('Could not delete task');
+
+      setTasks(prev => prev.filter(t => t.id !== taskId));
     } finally {
       setIsDeletingTask(false);
     }
-  }, [tasks, reminders]);
+  }, [tasks, reminders, toast]);
 
   const toggleTaskCompletion = useCallback(async (taskId: string) => {
     setIsTogglingTask(true);
@@ -433,18 +474,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const newMeeting = await MeetingsAPI.create(meeting);
       setMeetings(prev => [...prev, newMeeting]);
+      toast.success('Meeting scheduled', newMeeting.title);
     } catch (err) {
       console.error('Error adding meeting:', err);
       setError('Failed to add meeting');
-      
-      // Add to local state even if API fails
-      const localMeeting: Meeting = {
-        ...meeting,
-        id: uuidv4()
-      };
+      toast.error('Could not schedule meeting');
+
+      const localMeeting: Meeting = { ...meeting, id: uuidv4() };
       setMeetings(prev => [...prev, localMeeting]);
     }
-  }, []);
+  }, [toast]);
 
   const updateMeeting = useCallback(async (meetingId: string, updates: Partial<Meeting>) => {
     try {
@@ -460,17 +499,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const deleteMeeting = useCallback(async (meetingId: string) => {
+    const m = meetings.find(x => x.id === meetingId);
     try {
       await MeetingsAPI.delete(meetingId);
       setMeetings(prev => prev.filter(meeting => meeting.id !== meetingId));
+      toast.success('Meeting deleted', m?.title);
     } catch (err) {
       console.error('Error deleting meeting:', err);
       setError('Failed to delete meeting');
-      
-      // Delete from local state even if API fails
+      toast.error('Could not delete meeting');
+
       setMeetings(prev => prev.filter(meeting => meeting.id !== meetingId));
     }
-  }, []);
+  }, [meetings, toast]);
 
   const toggleMeetingCompletion = useCallback(async (meetingId: string) => {
     const meeting = meetings.find(m => m.id === meetingId);
@@ -493,18 +534,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const newReminder = await RemindersAPI.create(reminder);
       setReminders(prev => [...prev, newReminder]);
+      toast.success('Reminder added', newReminder.title);
     } catch (err) {
       console.error('Error adding reminder:', err);
       setError('Failed to add reminder');
-      
-      // Add to local state even if API fails
-      const localReminder: Reminder = {
-        ...reminder,
-        id: uuidv4()
-      };
+      toast.error('Could not add reminder');
+
+      const localReminder: Reminder = { ...reminder, id: uuidv4() };
       setReminders(prev => [...prev, localReminder]);
     }
-  }, []);
+  }, [toast]);
 
   const updateReminder = useCallback(async (reminderId: string, updates: Partial<Reminder>) => {
     try {
@@ -520,17 +559,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const deleteReminder = useCallback(async (reminderId: string) => {
+    const r = reminders.find(x => x.id === reminderId);
     try {
       await RemindersAPI.delete(reminderId);
       setReminders(prev => prev.filter(reminder => reminder.id !== reminderId));
+      toast.success('Reminder deleted', r?.title);
     } catch (err) {
       console.error('Error deleting reminder:', err);
       setError('Failed to delete reminder');
-      
-      // Delete from local state even if API fails
+      toast.error('Could not delete reminder');
+
       setReminders(prev => prev.filter(reminder => reminder.id !== reminderId));
     }
-  }, []);
+  }, [reminders, toast]);
 
   const toggleReminderCompletion = useCallback(async (reminderId: string) => {
     const reminder = reminders.find(r => r.id === reminderId);
@@ -677,10 +718,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setReminders(prev => prev.map(r => 
         r.id === reminderId ? updatedReminder : r
       ));
-      
+      toast.success('Task created from reminder', reminder.title);
+
     } catch (err) {
       console.error('Error converting reminder to task:', err);
       setError('Failed to convert reminder to task');
+      toast.error('Could not convert reminder');
       
       // Fallback to local state if API fails
       const newTask: Task = {
@@ -713,7 +756,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : r
       ));
     }
-  }, [reminders, currentDate]);
+  }, [reminders, currentDate, toast]);
 
   // Helper function to check if a reminder can be converted to task
   const canConvertReminderToTask = useCallback((reminder: Reminder): boolean => {

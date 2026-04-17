@@ -1,83 +1,32 @@
 import React from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled from 'styled-components';
+import { Spinner } from '../ui/primitives';
 
-interface LoadingStateProps {
+interface Props {
   message?: string;
 }
 
-const rotate = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
-
-const LoadingContainer = styled.div`
+const Wrap = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  gap: var(--s-4);
+  padding: var(--s-9) var(--s-5);
   text-align: center;
 `;
 
-const Spinner = styled.div`
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 4px solid rgba(0, 0, 128, 0.2);
-  border-top-color: #000080;
-  animation: ${rotate} 1s linear infinite;
-  margin-bottom: 16px;
-`;
-
 const Message = styled.div`
-  font-size: 1.1rem;
-  color: #333;
-  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+  letter-spacing: 0.02em;
 `;
 
-const LoadingBar = styled.div`
-  width: 250px;
-  height: 24px;
-  border: 1px solid #adadad;
-  background-color: #fff;
-  position: relative;
-  overflow: hidden;
-  margin-top: 12px;
-`;
+const LoadingState: React.FC<Props> = ({ message = 'Loading…' }) => (
+  <Wrap>
+    <Spinner $size={28} />
+    <Message>{message}</Message>
+  </Wrap>
+);
 
-const LoadingProgress = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 20%;
-  background: linear-gradient(90deg, #245edb, #3a7bd5);
-  animation: progress 1.5s infinite linear;
-  
-  @keyframes progress {
-    0% {
-      left: -20%;
-    }
-    100% {
-      left: 100%;
-    }
-  }
-`;
-
-const LoadingState: React.FC<LoadingStateProps> = ({ message = 'Loading...' }) => {
-  return (
-    <LoadingContainer>
-      <Spinner />
-      <Message>{message}</Message>
-      <LoadingBar>
-        <LoadingProgress />
-      </LoadingBar>
-    </LoadingContainer>
-  );
-};
-
-export default LoadingState; 
+export default LoadingState;

@@ -1,169 +1,111 @@
 import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAppContext } from '../../context/AppContext';
+import { Button, IconButton, Badge } from '../ui/primitives';
+import { IconPlay, IconPause, IconStop, IconClock } from '../ui/icons';
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  50% { opacity: 0.55; }
 `;
 
-const TimerContainer = styled.div`
-  padding: 12px 20px;
-  background: #28a745;
-  color: white;
+const Bar = styled.div`
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: calc(-1 * var(--s-6)) calc(-1 * var(--s-7)) var(--s-5);
+  padding: var(--s-3) var(--s-7);
+  background: linear-gradient(180deg, rgba(76,194,255,0.10), rgba(76,194,255,0.04));
+  border-bottom: 1px solid var(--accent-soft);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
-  gap: 20px;
-  border-radius: 4px;
-  margin-bottom: 15px;
+  gap: var(--s-4);
+
+  @media (max-width: 720px) {
+    margin: calc(-1 * var(--s-4)) calc(-1 * var(--s-4)) var(--s-3);
+    padding: var(--s-3) var(--s-4);
+  }
 `;
 
-const TimerDisplay = styled.div<{ $isPaused?: boolean }>`
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 28px;
-  font-weight: bold;
-  background: rgba(0,0,0,0.3);
-  color: ${props => props.$isPaused ? '#ffc107' : '#fff'};
-  padding: 8px 20px;
-  border-radius: 4px;
-  min-width: 140px;
-  text-align: center;
-  animation: ${props => props.$isPaused ? pulse : 'none'} 1s ease-in-out infinite;
+const TimeDisplay = styled.div<{ $paused?: boolean }>`
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: ${p => p.$paused ? 'var(--warning)' : 'var(--accent)'};
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  animation: ${p => p.$paused ? pulse : 'none'} 1.4s ease-in-out infinite;
+  min-width: 110px;
 `;
 
 const TaskInfo = styled.div`
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 `;
 
 const TaskName = styled.div`
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
 `;
 
 const TaskMeta = styled.div`
-  font-size: 12px;
-  opacity: 0.9;
-  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 `;
 
-const BreakBadge = styled.span`
-  display: inline-block;
-  padding: 2px 8px;
-  background: rgba(255,193,7,0.2);
-  color: #ffc107;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  margin-left: 10px;
-`;
-
-const ButtonContainer = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const ActionButton = styled.button<{ $variant?: 'resume' | 'pause' | 'stop' }>`
-  background: ${props => {
-    switch (props.$variant) {
-      case 'pause': return 'rgba(255,255,255,0.2)';
-      case 'stop': return '#dc3545';
-      default: return '#fff';
-    }
-  }};
-  color: ${props => props.$variant === 'stop' || props.$variant === 'pause' ? '#fff' : '#1e7e34'};
-  font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.15s;
-  
-  &:hover {
-    background: ${props => {
-      switch (props.$variant) {
-        case 'pause': return 'rgba(255,255,255,0.3)';
-        case 'stop': return '#c82333';
-        default: return '#f8f9fa';
-      }
-    }};
-  }
-`;
+const formatTime = (s: number): string => {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+};
 
 const Timer: React.FC = () => {
-  const { 
-    tasks, 
-    activeTaskId, 
-    currentTimer, 
-    stopTimer,
-    pauseTimer,
-    resumeTimer,
-    isPaused,
-    breakTime 
-  } = useAppContext();
-  
-  const [displayTime, setDisplayTime] = useState<string>("00:00:00");
-  const [displayBreakTime, setDisplayBreakTime] = useState<string>("00:00:00");
-  
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-  
-  useEffect(() => {
-    setDisplayTime(formatTime(currentTimer));
-  }, [currentTimer]);
+  const { tasks, activeTaskId, currentTimer, stopTimer, pauseTimer, resumeTimer, isPaused, breakTime } = useAppContext();
+  const [display, setDisplay] = useState('00:00:00');
+  const [breakDisplay, setBreakDisplay] = useState('00:00:00');
 
-  useEffect(() => {
-    setDisplayBreakTime(formatTime(breakTime));
-  }, [breakTime]);
-  
-  const activeTask = tasks.find(task => task.id === activeTaskId);
-  
-  if (!activeTaskId || !activeTask) {
-    return null;
-  }
-  
+  useEffect(() => setDisplay(formatTime(currentTimer)), [currentTimer]);
+  useEffect(() => setBreakDisplay(formatTime(breakTime)), [breakTime]);
+
+  const activeTask = tasks.find(t => t.id === activeTaskId);
+  if (!activeTaskId || !activeTask) return null;
+
   return (
-    <TimerContainer>
-      <TimerDisplay $isPaused={isPaused}>
-        {displayTime}
-      </TimerDisplay>
-      
+    <Bar>
+      <TimeDisplay $paused={isPaused}>{display}</TimeDisplay>
       <TaskInfo>
         <TaskName>
-          {isPaused ? '⏸️' : '▶️'} {activeTask.title}
-          {breakTime > 0 && <BreakBadge>☕ Break: {displayBreakTime}</BreakBadge>}
+          <Badge $variant={isPaused ? 'warning' : 'accent'}><IconClock /> {isPaused ? 'Paused' : 'Tracking'}</Badge>
+          <span>{activeTask.title}</span>
+          {breakTime > 0 && <Badge $variant="warning">Break · {breakDisplay}</Badge>}
         </TaskName>
-        {activeTask.timeSpent > 0 && (
-          <TaskMeta>Total: {formatTime(activeTask.timeSpent + currentTimer)}</TaskMeta>
-        )}
+        {activeTask.timeSpent > 0 && <TaskMeta>Total: {formatTime(activeTask.timeSpent + currentTimer)}</TaskMeta>}
       </TaskInfo>
-      
-      <ButtonContainer>
-        {isPaused ? (
-          <ActionButton onClick={() => resumeTimer()}>
-            ▶ Resume
-          </ActionButton>
-        ) : (
-          <ActionButton $variant="pause" onClick={() => pauseTimer()}>
-            ⏸ Pause
-          </ActionButton>
-        )}
-        <ActionButton $variant="stop" onClick={() => stopTimer(activeTaskId)}>
-          ⏹ Stop
-        </ActionButton>
-      </ButtonContainer>
-    </TimerContainer>
+      {isPaused ? (
+        <Button $variant="primary" $size="sm" onClick={() => resumeTimer()}>
+          <IconPlay /> Resume
+        </Button>
+      ) : (
+        <Button $variant="secondary" $size="sm" onClick={() => pauseTimer()}>
+          <IconPause /> Pause
+        </Button>
+      )}
+      <IconButton $variant="danger" $size="sm" onClick={() => stopTimer(activeTaskId)} title="Stop">
+        <IconStop />
+      </IconButton>
+    </Bar>
   );
 };
 

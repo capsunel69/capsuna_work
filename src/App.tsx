@@ -8,25 +8,28 @@ import Meetings from './pages/Meetings';
 import Reminders from './pages/Reminders';
 import Timer from './components/timer/Timer';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { ToastProvider } from './components/ui/Toast';
 
 function App() {
   return (
     <AuthProvider>
-      <AppProvider>
-        <Router>
-          <ProtectedRoute>
-            <Layout>
-              <Timer />
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/tasks" element={<Tasks />} />
-                <Route path="/meetings" element={<Meetings />} />
-                <Route path="/reminders" element={<Reminders />} />
-              </Routes>
-            </Layout>
-          </ProtectedRoute>
-        </Router>
-      </AppProvider>
+      <ToastProvider>
+        <AppProvider>
+          <Router>
+            <ProtectedRoute>
+              <Layout>
+                <Timer />
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/tasks" element={<Tasks />} />
+                  <Route path="/meetings" element={<Meetings />} />
+                  <Route path="/reminders" element={<Reminders />} />
+                </Routes>
+              </Layout>
+            </ProtectedRoute>
+          </Router>
+        </AppProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

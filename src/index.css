@@ -1,123 +1,141 @@
-/* Global styles - Clean Retro Theme */
-* {
-  box-sizing: border-box;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+/* =====================================================================
+   Capsuna Control Panel — Design Tokens & Globals
+   Futuristic minimal. Dark by default. Built to be themed and extended.
+   ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Surfaces (dark) ───────────────────────────────────────────────── */
+  --bg-0: #07090d;        /* page */
+  --bg-1: #0c1015;        /* sidebar, high-level chrome */
+  --bg-2: #11161d;        /* card */
+  --bg-3: #161c25;        /* card hover / nested */
+  --bg-4: #1d2530;        /* input, subtle highlight */
+
+  /* ── Borders / dividers ────────────────────────────────────────────── */
+  --border-1: rgba(255, 255, 255, 0.06);
+  --border-2: rgba(255, 255, 255, 0.10);
+  --border-3: rgba(255, 255, 255, 0.16);
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --text-1: #e7ecf3;       /* primary */
+  --text-2: #a4adbb;       /* secondary */
+  --text-3: #6b7484;       /* tertiary / muted */
+  --text-4: #4a5060;       /* disabled */
+
+  /* ── Accent (electric cyan) ────────────────────────────────────────── */
+  --accent: #4cc2ff;
+  --accent-strong: #2aa8f0;
+  --accent-soft: rgba(76, 194, 255, 0.12);
+  --accent-glow: rgba(76, 194, 255, 0.35);
+
+  /* ── Semantic ──────────────────────────────────────────────────────── */
+  --success: #22d39a;
+  --success-soft: rgba(34, 211, 154, 0.12);
+  --warning: #f5b544;
+  --warning-soft: rgba(245, 181, 68, 0.12);
+  --danger: #ff5d6c;
+  --danger-soft: rgba(255, 93, 108, 0.12);
+  --info: #8b9cff;
+  --info-soft: rgba(139, 156, 255, 0.12);
+  --purple: #b58aff;
+  --purple-soft: rgba(181, 138, 255, 0.12);
+
+  /* ── Radii ─────────────────────────────────────────────────────────── */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+
+  /* ── Spacing scale (4px) ───────────────────────────────────────────── */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+
+  /* ── Type ──────────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ── Effects ───────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.35);
+  --shadow-lg: 0 24px 64px rgba(0,0,0,0.45);
+  --ring: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-soft);
+
+  /* ── Layout ────────────────────────────────────────────────────────── */
+  --sidebar-w: 240px;
+  --sidebar-w-collapsed: 64px;
+  --topbar-h: 56px;
 }
 
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
 body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  color: #222;
-  background: #008080;
+  color: var(--text-1);
+  background: var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Buttons */
-button {
+button, input, select, textarea {
   font-family: inherit;
-  font-size: 13px;
+  color: inherit;
+}
+
+button { cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-strong); }
+
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+
+/* Subtle ambient background grid */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(800px 400px at 80% -10%, rgba(76, 194, 255, 0.08), transparent 60%),
+    radial-gradient(600px 400px at -10% 100%, rgba(181, 138, 255, 0.06), transparent 60%),
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px) 0 0 / 100% 32px,
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px) 0 0 / 32px 100%;
+  z-index: 0;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--bg-4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-3); background-clip: content-box; }
+
+/* Selection */
+::selection { background: var(--accent-soft); color: var(--text-1); }
+
+/* Focus visible */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
+button:focus-visible { outline-offset: 2px; }
+
+/* Native datetime picker tint (Chrome) */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) opacity(0.7);
   cursor: pointer;
 }
 
-/* Form controls */
-input, select, textarea {
-  font-family: inherit;
-  font-size: 14px;
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
-  margin-top: 0;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-/* Links */
-a {
-  color: #0066cc;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-/* Focus styles */
-button:focus, input:focus, select:focus, textarea:focus {
-  outline: none;
-}
-
-/* Custom scrollbars - retro style */
-::-webkit-scrollbar {
-  width: 16px;
-  height: 16px;
-}
-
-::-webkit-scrollbar-track {
-  background: #c0c0c0;
-  border: 1px solid #808080;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #dfdfdf, #c0c0c0);
-  border: 1px solid #808080;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #e8e8e8, #d0d0d0);
-}
-
-::-webkit-scrollbar-button {
-  background: #c0c0c0;
-  border: 1px solid #808080;
-  height: 16px;
-  width: 16px;
-}
-
-#root {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-}
-
-/* Override 98.css font to use clean system font */
-.window,
-.title-bar,
-.title-bar-text,
-.title-bar-controls button,
-.window-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-}
-
-.title-bar {
-  background: linear-gradient(180deg, #0a246a, #0d47a1) !important;
-  padding: 4px 8px !important;
-}
-
-.title-bar-text {
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  letter-spacing: 0.3px;
-}
-
-.title-bar-controls button {
-  min-width: 22px !important;
-  min-height: 22px !important;
-}
-
-.window {
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
-}
-
-/* Error state */
-.error {
-  background-color: #dc3545 !important;
-  color: white !important;
-  padding: 10px 15px;
-  border-radius: 4px;
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }

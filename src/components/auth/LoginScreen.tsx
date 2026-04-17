@@ -1,168 +1,194 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../context/AuthContext';
-import './LoginScreen.css';
+import { Button, Input } from '../ui/primitives';
+import { IconLock, IconSpark, IconAlert } from '../ui/icons';
+
+const pulseGlow = keyframes`
+  0%, 100% { box-shadow: 0 0 30px rgba(76,194,255,0.25), inset 0 0 0 1px rgba(76,194,255,0.2); }
+  50%      { box-shadow: 0 0 60px rgba(76,194,255,0.45), inset 0 0 0 1px rgba(76,194,255,0.4); }
+`;
+
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
+
+const Stage = styled.div`
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(1200px 600px at 50% 30%, rgba(76,194,255,0.08), transparent 60%), var(--bg-0);
+  display: grid;
+  place-items: center;
+  padding: var(--s-5);
+  overflow: hidden;
+  z-index: 1;
+
+  &:before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 100% 40px,
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 40px 100%;
+    pointer-events: none;
+  }
+`;
+
+const Panel = styled.div`
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-xl);
+  padding: var(--s-7);
+  animation: ${fadeIn} 0.4s ease-out, ${pulseGlow} 4s ease-in-out infinite;
+`;
+
+const Brand = styled.div`
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+`;
+
+const Logo = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  color: #06121d;
+
+  svg { width: 22px; height: 22px; }
+`;
+
+const BrandText = styled.div`
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+
+  strong { font-size: 15px; color: var(--text-1); letter-spacing: 0.02em; }
+  span { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); margin-top: 4px; }
+`;
+
+const Heading = styled.h1`
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+
+  svg { width: 18px; height: 18px; color: var(--accent); }
+`;
+
+const Sub = styled.p`
+  font-size: 13px;
+  color: var(--text-3);
+  margin: 0 0 var(--s-5) 0;
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+`;
+
+const Mono = styled.div`
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border-1);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+
+  .dot {
+    display: inline-block;
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    margin-right: 6px;
+  }
+`;
+
+const ErrorBox = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--danger-soft);
+  border: 1px solid rgba(255,93,108,0.25);
+  border-radius: var(--r-sm);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 500;
+
+  svg { width: 14px; height: 14px; }
+`;
 
 const LoginScreen: React.FC = () => {
   const { login } = useAuth();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showError, setShowError] = useState(false);
-  const [accessAttempts, setAccessAttempts] = useState(0);
-  const [matrix, setMatrix] = useState<string[]>([]);
-  const [glitchEffect, setGlitchEffect] = useState(false);
-  const matrixRef = useRef<HTMLDivElement>(null);
+  const [attempts, setAttempts] = useState(0);
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Trigger glitch effect
-    setGlitchEffect(true);
-    setTimeout(() => setGlitchEffect(false), 500);
-    
-    const success = login(password);
-    
-    if (!success) {
-      setAccessAttempts(prev => prev + 1);
-      setError(`ACCESS DENIED (${accessAttempts + 1}/3)`);
-      setShowError(true);
+    const ok = login(password);
+    if (!ok) {
+      setAttempts(a => a + 1);
+      setError(`Authentication failed (${attempts + 1}/3)`);
       setPassword('');
-      
-      // Add more intense effects after multiple failed attempts
-      if (accessAttempts >= 2) {
-        document.body.classList.add('critical-error');
-        setTimeout(() => {
-          document.body.classList.remove('critical-error');
-        }, 1000);
-      }
-      
-      // Auto-hide error after 3 seconds
-      setTimeout(() => {
-        setShowError(false);
-      }, 3000);
+      setTimeout(() => setError(''), 3000);
     }
   };
 
-  // Retro "typing" effect for the welcome text
-  const [displayText, setDisplayText] = useState('');
-  const fullText = 'CAPSUNA SECURE TERMINAL v0.9.5';
-  
   useEffect(() => {
-    let i = 0;
-    const typingInterval = setInterval(() => {
-      if (i < fullText.length) {
-        const nextChar = fullText.charAt(i);
-        console.log(`Adding character: ${nextChar}, Index: ${i}`);
-        setDisplayText(prev => {
-          const newText = prev + nextChar;
-          console.log(`New display text: ${newText}`);
-          return newText;
-        });
-        i++;
-      } else {
-        console.log('Typing effect complete');
-        clearInterval(typingInterval);
-      }
-    }, 100);
-    
-    return () => clearInterval(typingInterval);
-  }, []);
-
-  // Matrix effect
-  useEffect(() => {
-    // Create matrix rain effect
-    const createRain = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#@%&*()<>[]{};:+-=~';
-      const height = matrixRef.current?.clientHeight || 300;
-      const rows = Math.floor(height / 12); // Rough char height
-      
-      const newMatrix: string[] = [];
-      for (let i = 0; i < rows; i++) {
-        let row = '';
-        const rowLength = Math.floor(Math.random() * 40) + 5;
-        for (let j = 0; j < rowLength; j++) {
-          row += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        newMatrix.push(row);
-      }
-      setMatrix(newMatrix);
-    };
-
-    const interval = setInterval(createRain, 300);
-    createRain(); // Initial call
-    
-    return () => clearInterval(interval);
+    document.title = 'Capsuna · Sign in';
   }, []);
 
   return (
-    <div className={`login-screen ${glitchEffect ? 'glitch' : ''}`}>
-      <div className="login-container">
-        <div className="terminal-header">
-          <div className="header-buttons">
-            <span className="terminal-button"></span>
-            <span className="terminal-button"></span>
-            <span className="terminal-button"></span>
-          </div>
-          <div className="terminal-title">
-            {displayText}<span className="cursor">_</span>
-          </div>
-        </div>
-        
-        <div className="terminal-screen">
-          <div className="matrix-bg" ref={matrixRef}>
-            {matrix.map((row, i) => (
-              <div key={i} className="matrix-row" style={{ 
-                animationDelay: `${Math.random() * 2}s`,
-                opacity: Math.max(0.1, Math.random())
-              }}>
-                {row}
-              </div>
-            ))}
-          </div>
-          
-          <div className="terminal-content">
-            <div className="terminal-prompt">[SYSTEM]$ Authentication required</div>
-            <div className="terminal-prompt">[SYSTEM]$ Enter cipher key to proceed</div>
-            
-            <form onSubmit={handleSubmit} className="login-form">
-              <div className="input-group">
-                <div className="prompt-wrapper">
-                  <span className="terminal-prompt-symbol">&gt;</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="terminal-input"
-                    placeholder="ENTER ACCESS CODE"
-                    autoFocus
-                  />
-                </div>
-              </div>
-              
-              {showError && (
-                <div className="error-message">
-                  <div className="error-icon">!</div>
-                  <div className="error-text">{error}</div>
-                </div>
-              )}
-              
-              <button type="submit" className="terminal-button-submit">
-                AUTHENTICATE
-              </button>
-            </form>
-            
-            <div className="terminal-footer">
-              <div className="status-indicator">
-                <div className="indicator-dot"></div>
-                <div className="indicator-text">SECURE CONNECTION</div>
-              </div>
-              <div className="encryption-text">RSA-4096 ENCRYPTION ACTIVE</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Stage>
+      <Panel>
+        <Brand>
+          <Logo><IconSpark /></Logo>
+          <BrandText>
+            <strong>Capsuna</strong>
+            <span>control panel</span>
+          </BrandText>
+        </Brand>
+
+        <Heading><IconLock /> Authenticate</Heading>
+        <Sub>Enter your access key to enter the control panel.</Sub>
+
+        <Form onSubmit={submit}>
+          <Input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Access key"
+            autoFocus
+          />
+          {error && <ErrorBox><IconAlert /> {error}</ErrorBox>}
+          <Button $variant="primary" type="submit" $block>Continue</Button>
+        </Form>
+
+        <Mono>
+          <span><span className="dot" />SECURE LINK</span>
+          <span>v1.0 · CPS-{Math.random().toString(36).slice(2, 8).toUpperCase()}</span>
+        </Mono>
+      </Panel>
+    </Stage>
   );
 };
 
-export default LoginScreen; 
+export default LoginScreen;
