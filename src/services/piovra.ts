@@ -116,7 +116,7 @@ export interface OrchestrateOptions {
   instanceId?: string;
   signal?: AbortSignal;
   onStep?: (step: AgentStep) => void;
-  onStarted?: (info: { instanceId: string }) => void;
+  onStarted?: (info: { instanceId: string; runId?: string }) => void;
   onCompleted?: (info: {
     runId: string;
     output: string;
@@ -124,6 +124,9 @@ export interface OrchestrateOptions {
     tokensOut: number | null;
   }) => void;
   onError?: (message: string) => void;
+  /** How long to keep polling after the SSE stream drops before giving up.
+   * Defaults to 10 minutes — enough for Netlify Pro (10m) and most long runs. */
+  pollTimeoutMs?: number;
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -186,40 +189,84 @@ export const PiovraAPI = {
 
   /**
    * Start an orchestration turn and stream events.
-   * Returns a promise that resolves when the run finishes or rejects on error.
+   *
+   * Netlify Functions cap synchronous execution at ~26s (free) / 10min (Pro),
+   * which is well under some long-running agent runs. So if the SSE stream
+   * drops before we see a terminal event, we transparently fall back to
+   * polling `/runs/:id` until the run reaches `succeeded`/`failed`/`cancelled`,
+   * replaying any steps we missed so the UI stays in sync.
+   *
+   * The promise resolves once either path (stream or polling) terminates.
    */
   orchestrate: async (opts: OrchestrateOptions): Promise<void> => {
-    const res = await fetch(`${BASE_URL}/orchestrate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-      body: JSON.stringify({ input: opts.input, instanceId: opts.instanceId }),
-      signal: opts.signal,
-    });
-    if (!res.ok || !res.body) {
-      const text = await res.text().catch(() => '');
-      throw new Error(text || `Piovra orchestrate -> ${res.status}`);
-    }
+    // Track state across SSE + polling so neither layer double-fires callbacks
+    // or misses steps.
+    const state: OrchestrateState = {
+      runId: null,
+      stepsEmitted: 0,
+      terminalSeen: false,
+    };
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    // Wrap the caller's onStep so we always know how many steps have been
+    // pushed to the consumer — polling uses this to avoid duplicates.
+    const wrappedOnStep = (step: AgentStep): void => {
+      state.stepsEmitted += 1;
+      opts.onStep?.(step);
+    };
+    const wrappedOpts: OrchestrateOptions = { ...opts, onStep: wrappedOnStep };
 
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      let sepIndex: number;
-      while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
-        const rawEvent = buffer.slice(0, sepIndex);
-        buffer = buffer.slice(sepIndex + 2);
-        handleEvent(rawEvent, opts);
+    try {
+      const res = await fetch(`${BASE_URL}/orchestrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        body: JSON.stringify({ input: opts.input, instanceId: opts.instanceId }),
+        signal: opts.signal,
+      });
+      if (!res.ok || !res.body) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Piovra orchestrate -> ${res.status}`);
       }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sepIndex: number;
+        while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex);
+          buffer = buffer.slice(sepIndex + 2);
+          handleEvent(rawEvent, wrappedOpts, state);
+        }
+      }
+    } catch (err) {
+      // Caller abort — surface it. Anything else (network blip, Netlify
+      // function timeout, etc.) falls through to polling below.
+      if (opts.signal?.aborted) throw err;
     }
+
+    if (state.terminalSeen) return;
+    if (opts.signal?.aborted) return;
+    if (!state.runId) {
+      opts.onError?.('Piovra stream closed before a run was created.');
+      return;
+    }
+
+    await pollRunUntilDone(state.runId, wrappedOpts, state);
   },
 };
 
-function handleEvent(raw: string, opts: OrchestrateOptions): void {
+interface OrchestrateState {
+  runId: string | null;
+  stepsEmitted: number;
+  terminalSeen: boolean;
+}
+
+function handleEvent(raw: string, opts: OrchestrateOptions, state: OrchestrateState): void {
   let event = 'message';
   const dataLines: string[] = [];
   for (const line of raw.split('\n')) {
@@ -237,19 +284,77 @@ function handleEvent(raw: string, opts: OrchestrateOptions): void {
   }
 
   switch (event) {
-    case 'run.started':
-      opts.onStarted?.(data as { instanceId: string });
+    case 'run.started': {
+      const info = data as { instanceId: string; runId?: string };
+      if (info.runId) state.runId = info.runId;
+      opts.onStarted?.(info);
       break;
+    }
     case 'step':
       opts.onStep?.(data as AgentStep);
       break;
     case 'run.completed':
+      state.terminalSeen = true;
       opts.onCompleted?.(
         data as { runId: string; output: string; tokensIn: number | null; tokensOut: number | null },
       );
       break;
     case 'run.failed':
+      state.terminalSeen = true;
       opts.onError?.((data as { error: string }).error);
       break;
   }
+}
+
+async function pollRunUntilDone(
+  runId: string,
+  opts: OrchestrateOptions,
+  state: OrchestrateState,
+): Promise<void> {
+  const deadline = Date.now() + (opts.pollTimeoutMs ?? 10 * 60 * 1000);
+  const intervalMs = 2_000;
+
+  while (Date.now() < deadline) {
+    if (opts.signal?.aborted) return;
+
+    let run: AgentRun;
+    try {
+      run = await PiovraAPI.getRun(runId);
+    } catch {
+      // Transient network blip — keep trying until the deadline.
+      await sleep(intervalMs);
+      continue;
+    }
+
+    // Replay any steps we haven't already pushed to the consumer.
+    if (Array.isArray(run.steps) && run.steps.length > state.stepsEmitted) {
+      for (let i = state.stepsEmitted; i < run.steps.length; i++) {
+        opts.onStep?.(run.steps[i]);
+      }
+    }
+
+    if (run.status === 'succeeded') {
+      state.terminalSeen = true;
+      opts.onCompleted?.({
+        runId: run.id,
+        output: run.output ?? '',
+        tokensIn: run.tokensIn,
+        tokensOut: run.tokensOut,
+      });
+      return;
+    }
+    if (run.status === 'failed' || run.status === 'cancelled') {
+      state.terminalSeen = true;
+      opts.onError?.(run.error ?? run.status);
+      return;
+    }
+
+    await sleep(intervalMs);
+  }
+
+  opts.onError?.('Timed out waiting for run to finish. It may still be running server-side.');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
