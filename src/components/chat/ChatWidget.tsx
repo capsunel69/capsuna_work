@@ -4,6 +4,7 @@ import { IconButton, Spinner } from '../ui/primitives';
 import { IconBot, IconSend, IconStop, IconRefresh, IconX } from '../ui/icons';
 import StepCard from '../agents/StepCard';
 import { useChat } from '../../context/ChatContext';
+import { useOverlayCount } from '../../hooks/useOverlayStack';
 
 /* ── Launcher bubble ───────────────────────────────────────────────────── */
 
@@ -451,6 +452,8 @@ const SUGGESTIONS = [
 
 const ChatWidget: React.FC = () => {
   const { turns, status, send, abort, reset, isOpen, open, close, instanceId, setInstanceId } = useChat();
+  const overlayCount = useOverlayCount();
+  const bubbleHidden = isOpen || overlayCount > 0;
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -510,7 +513,7 @@ const ChatWidget: React.FC = () => {
 
   return (
     <>
-      <HoverRevealWrap $hidden={isOpen}>
+      <HoverRevealWrap $hidden={bubbleHidden}>
         <BubbleLabel>Ask Piovra</BubbleLabel>
         <BubbleButton onClick={() => open()} aria-label="Open assistant">
           <IconBot />

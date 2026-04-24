@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { IconX } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
+import { useRegisterOverlay } from '../../hooks/useOverlayStack';
 
 const slideIn = keyframes`
   from { transform: translateX(100%); }
@@ -64,6 +65,8 @@ interface DrawerProps {
 }
 
 const Drawer: React.FC<DrawerProps> = ({ open, title, onClose, children }) => {
+  useRegisterOverlay(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent): void => {

@@ -25,34 +25,26 @@ interface ModelGroup {
 
 const MODEL_GROUPS: ModelGroup[] = [
   {
-    label: 'OpenAI · GPT-5 family',
+    label: 'OpenAI · GPT-5 family (reasoning)',
     models: [
-      { id: 'openai:gpt-5',            label: 'gpt-5',            hint: 'flagship, highest quality' },
-      { id: 'openai:gpt-5-mini',       label: 'gpt-5-mini',       hint: 'balanced quality / cost' },
-      { id: 'openai:gpt-5-nano',       label: 'gpt-5-nano',       hint: 'cheapest, fastest' },
+      { id: 'openai:gpt-5.4',          label: 'gpt-5.4',          hint: 'latest frontier' },
+      { id: 'openai:gpt-5.4-mini',     label: 'gpt-5.4-mini',     hint: 'balanced quality / cost' },
+      { id: 'openai:gpt-5.4-nano',     label: 'gpt-5.4-nano',     hint: 'cheapest, fastest' },
       { id: 'openai:gpt-5.1',          label: 'gpt-5.1',          hint: 'refreshed flagship' },
       { id: 'openai:gpt-5.1-mini',     label: 'gpt-5.1-mini' },
       { id: 'openai:gpt-5.1-codex',    label: 'gpt-5.1-codex',    hint: 'coding-tuned' },
-      { id: 'openai:gpt-5.4',          label: 'gpt-5.4',          hint: 'latest frontier' },
-      { id: 'openai:gpt-5.4-mini',     label: 'gpt-5.4-mini' },
+      { id: 'openai:gpt-5',            label: 'gpt-5' },
+      { id: 'openai:gpt-5-mini',       label: 'gpt-5-mini' },
+      { id: 'openai:gpt-5-nano',       label: 'gpt-5-nano' },
     ],
   },
   {
     label: 'OpenAI · GPT-4 family',
     models: [
       { id: 'openai:gpt-4.1',          label: 'gpt-4.1' },
-      { id: 'openai:gpt-4.1-mini',     label: 'gpt-4.1-mini' },
+      { id: 'openai:gpt-4.1-mini',     label: 'gpt-4.1-mini',     hint: 'default — cheap & solid' },
       { id: 'openai:gpt-4.1-nano',     label: 'gpt-4.1-nano' },
-      { id: 'openai:gpt-4o',           label: 'gpt-4o' },
-      { id: 'openai:gpt-4o-mini',      label: 'gpt-4o-mini',      hint: 'default — cheap & solid' },
-    ],
-  },
-  {
-    label: 'OpenAI · reasoning',
-    models: [
-      { id: 'openai:o3',               label: 'o3',               hint: 'deep reasoning' },
-      { id: 'openai:o3-mini',          label: 'o3-mini' },
-      { id: 'openai:o4-mini',          label: 'o4-mini' },
+      { id: 'openai:gpt-4o-mini',      label: 'gpt-4o-mini',      hint: 'legacy' },
     ],
   },
   {
@@ -66,7 +58,7 @@ const MODEL_GROUPS: ModelGroup[] = [
   },
 ];
 
-const DEFAULT_MODEL_ID = 'openai:gpt-4o-mini';
+const DEFAULT_MODEL_ID = 'openai:gpt-4.1-mini';
 
 const ALL_MODEL_IDS = MODEL_GROUPS.flatMap((g) => g.models.map((m) => m.id));
 
