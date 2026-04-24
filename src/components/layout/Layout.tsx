@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
 import StickyNote from '../notes/StickyNote';
 import BackgroundFx from './BackgroundFx';
+import ChatWidget from '../chat/ChatWidget';
 import {
   IconDashboard, IconTasks, IconCalendar, IconBell, IconNote,
   IconLogout, IconChevronLeft, IconSpark, IconClock, IconBot,
@@ -384,6 +385,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       <StickyLayer>
         {showNotes && <StickyNote onClose={() => setShowNotes(false)} />}
+        <ChatWidget />
       </StickyLayer>
     </Shell>
   );

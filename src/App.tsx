@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
@@ -16,20 +17,22 @@ function App() {
     <AuthProvider>
       <ToastProvider>
         <AppProvider>
-          <Router>
-            <ProtectedRoute>
-              <Layout>
-                <Timer />
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/tasks" element={<Tasks />} />
-                  <Route path="/meetings" element={<Meetings />} />
-                  <Route path="/reminders" element={<Reminders />} />
-                  <Route path="/agents" element={<Agents />} />
-                </Routes>
-              </Layout>
-            </ProtectedRoute>
-          </Router>
+          <ChatProvider>
+            <Router>
+              <ProtectedRoute>
+                <Layout>
+                  <Timer />
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/tasks" element={<Tasks />} />
+                    <Route path="/meetings" element={<Meetings />} />
+                    <Route path="/reminders" element={<Reminders />} />
+                    <Route path="/agents" element={<Agents />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            </Router>
+          </ChatProvider>
         </AppProvider>
       </ToastProvider>
     </AuthProvider>
