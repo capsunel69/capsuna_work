@@ -21,13 +21,15 @@ const Header = styled.div`
   color: var(--text-3);
   border-bottom: 1px solid var(--border-1);
   background: var(--bg-1);
+
+  @media (max-width: 760px) { display: none; }
 `;
 
 const RowItem = styled.button`
   display: grid;
   grid-template-columns: 110px 2.4fr 100px 100px 140px;
   gap: var(--s-3);
-  padding: 12px var(--s-5);
+  padding: 14px var(--s-5);
   border-bottom: 1px solid var(--border-1);
   align-items: center;
   background: transparent;
@@ -38,6 +40,20 @@ const RowItem = styled.button`
 
   &:hover { background: var(--bg-3); }
   &:last-child { border-bottom: 0; }
+
+  @media (max-width: 760px) {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "status input  when"
+      "run    tokens tokens";
+    row-gap: 6px;
+
+    .cell-status { grid-area: status; }
+    .cell-input  { grid-area: input; }
+    .cell-tokens { grid-area: tokens; text-align: right; }
+    .cell-run    { grid-area: run; }
+    .cell-when   { grid-area: when; text-align: right; }
+  }
 `;
 
 const RunId = styled.span`
@@ -135,15 +151,15 @@ const RunsList: React.FC = () => {
           </Header>
           {runs.map((r) => (
             <RowItem key={r.id} onClick={() => setOpenId(r.id)}>
-              <div>
+              <div className="cell-status">
                 <Badge $variant={statusTone(r.status)}>{r.status}</Badge>
               </div>
-              <Input>{r.input}</Input>
-              <Tokens>
+              <Input className="cell-input">{r.input}</Input>
+              <Tokens className="cell-tokens">
                 {(r.tokensIn ?? 0) + (r.tokensOut ?? 0) || '—'}
               </Tokens>
-              <RunId>{r.id.slice(0, 8)}</RunId>
-              <Time style={{ textAlign: 'right' }}>{fmtDate(r.startedAt)}</Time>
+              <RunId className="cell-run">{r.id.slice(0, 8)}</RunId>
+              <Time className="cell-when" style={{ textAlign: 'right' }}>{fmtDate(r.startedAt)}</Time>
             </RowItem>
           ))}
         </Table>

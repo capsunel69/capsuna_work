@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Card, CardHeader, CardTitle, CardSubtle, EmptyState, Spinner } from '../ui/primitives';
 import { IconBot, IconSend } from '../ui/icons';
 import { PiovraAPI, type AgentDefinition, type AgentInstance, type AgentStatus } from '../../services/piovra';
+import { useChat } from '../../context/ChatContext';
 
 const Table = styled.div`
   display: flex;
@@ -21,17 +21,30 @@ const Header = styled.div`
   color: var(--text-3);
   border-bottom: 1px solid var(--border-1);
   background: var(--bg-1);
+
+  @media (max-width: 760px) {
+    display: none;
+  }
 `;
 
 const Row = styled.div`
   display: grid;
   grid-template-columns: 2fr 2fr 1fr 120px;
   gap: var(--s-3);
-  padding: 12px var(--s-5);
+  padding: 14px var(--s-5);
   border-bottom: 1px solid var(--border-1);
   align-items: center;
 
   &:last-child { border-bottom: 0; }
+
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "instance action"
+      "definition definition"
+      "status status";
+    row-gap: 10px;
+  }
 `;
 
 const Name = styled.div`
@@ -40,8 +53,22 @@ const Name = styled.div`
   gap: 2px;
   min-width: 0;
 
-  strong { font-size: 13px; color: var(--text-1); font-weight: 500; }
+  strong { font-size: 13.5px; color: var(--text-1); font-weight: 600; }
   span { font-size: 11.5px; color: var(--text-3); font-family: var(--font-mono); }
+`;
+
+const InstanceCell = styled(Name)`
+  @media (max-width: 760px) { grid-area: instance; }
+`;
+const DefinitionCell = styled(Name)`
+  @media (max-width: 760px) { grid-area: definition; }
+`;
+const StatusCell = styled.div`
+  @media (max-width: 760px) { grid-area: status; }
+`;
+const ActionCell = styled.div`
+  text-align: right;
+  @media (max-width: 760px) { grid-area: action; }
 `;
 
 const statusTone = (s: AgentStatus): 'neutral' | 'success' | 'warning' | 'danger' => {
@@ -54,7 +81,7 @@ const statusTone = (s: AgentStatus): 'neutral' | 'success' | 'warning' | 'danger
 };
 
 const InstancesList: React.FC = () => {
-  const navigate = useNavigate();
+  const { open: openChat } = useChat();
   const [instances, setInstances] = useState<AgentInstance[] | null>(null);
   const [defs, setDefs] = useState<AgentDefinition[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -73,10 +100,6 @@ const InstancesList: React.FC = () => {
     (defs ?? []).forEach((d) => map.set(d.id, d));
     return map;
   }, [defs]);
-
-  const openChat = (id: string): void => {
-    navigate(`/agents?tab=chat&instanceId=${encodeURIComponent(id)}`);
-  };
 
   return (
     <Card>
@@ -114,23 +137,23 @@ const InstancesList: React.FC = () => {
             const def = defById.get(i.definitionId);
             return (
               <Row key={i.id}>
-                <Name>
+                <InstanceCell>
                   <strong>{i.name}</strong>
                   <span>{i.id.slice(0, 8)}</span>
-                </Name>
-                <Name>
+                </InstanceCell>
+                <DefinitionCell>
                   <strong>{def?.name ?? '—'}</strong>
                   <span>{def?.model ?? i.definitionId.slice(0, 8)}</span>
-                </Name>
-                <div>
+                </DefinitionCell>
+                <StatusCell>
                   <Badge $variant={statusTone(i.status)}>{i.status}</Badge>
-                </div>
-                <div style={{ textAlign: 'right' }}>
+                </StatusCell>
+                <ActionCell>
                   <Button $variant="primary" $size="sm" onClick={() => openChat(i.id)}>
                     <IconSend />
                     Chat
                   </Button>
-                </div>
+                </ActionCell>
               </Row>
             );
           })}

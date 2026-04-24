@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
-  Badge, Button, Card, CardHeader, CardTitle, CardSubtle, EmptyState, Spinner,
+  Button, Card, CardHeader, CardTitle, CardSubtle, EmptyState, Spinner,
   Stack, Row,
 } from '../ui/primitives';
 import { IconBot, IconPlus, IconEdit } from '../ui/icons';
@@ -16,7 +16,7 @@ const Table = styled.div`
 
 const Header = styled.div`
   display: grid;
-  grid-template-columns: 2fr 1.2fr 2fr 70px;
+  grid-template-columns: 1.6fr 1.2fr 2.2fr 70px;
   gap: var(--s-3);
   padding: 10px var(--s-5);
   font-size: 10.5px;
@@ -25,13 +25,17 @@ const Header = styled.div`
   color: var(--text-3);
   border-bottom: 1px solid var(--border-1);
   background: var(--bg-1);
+
+  @media (max-width: 840px) {
+    display: none;
+  }
 `;
 
 const RowItem = styled.button`
   display: grid;
-  grid-template-columns: 2fr 1.2fr 2fr 70px;
+  grid-template-columns: 1.6fr 1.2fr 2.2fr 70px;
   gap: var(--s-3);
-  padding: 12px var(--s-5);
+  padding: 14px var(--s-5);
   border-bottom: 1px solid var(--border-1);
   background: transparent;
   text-align: left;
@@ -39,9 +43,19 @@ const RowItem = styled.button`
   width: 100%;
   cursor: pointer;
   color: var(--text-1);
+  align-items: center;
 
   &:hover { background: var(--bg-3); }
   &:last-child { border-bottom: 0; }
+
+  @media (max-width: 840px) {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name version"
+      "model model"
+      "skills skills";
+    row-gap: 8px;
+  }
 `;
 
 const Name = styled.div`
@@ -50,8 +64,12 @@ const Name = styled.div`
   gap: 2px;
   min-width: 0;
 
-  strong { font-size: 13px; font-weight: 500; color: var(--text-1); }
+  strong { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
   span { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (max-width: 840px) {
+    grid-area: name;
+  }
 `;
 
 const Model = styled.span`
@@ -59,6 +77,10 @@ const Model = styled.span`
   font-size: 11.5px;
   color: var(--text-2);
   align-self: center;
+
+  @media (max-width: 840px) {
+    grid-area: model;
+  }
 `;
 
 const Skills = styled.div`
@@ -66,6 +88,40 @@ const Skills = styled.div`
   flex-wrap: wrap;
   gap: 4px;
   align-self: center;
+  min-width: 0;
+
+  @media (max-width: 840px) {
+    grid-area: skills;
+  }
+`;
+
+const SkillChip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  color: var(--text-2);
+  border: 1px solid var(--border-1);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const MoreChip = styled(SkillChip)`
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+`;
+
+const NoneChip = styled(SkillChip)`
+  font-style: italic;
+  color: var(--text-4);
 `;
 
 const Version = styled.span`
@@ -74,6 +130,10 @@ const Version = styled.span`
   font-size: 11.5px;
   color: var(--text-3);
   text-align: right;
+
+  @media (max-width: 840px) {
+    grid-area: version;
+  }
 `;
 
 const Pre = styled.pre`
@@ -183,9 +243,20 @@ const DefinitionsList: React.FC = () => {
               </Name>
               <Model>{d.model}</Model>
               <Skills>
-                {d.skills.length === 0 ? <Badge>none</Badge> : d.skills.map((s) => (
-                  <Badge key={s}>{s}</Badge>
-                ))}
+                {d.skills.length === 0 ? (
+                  <NoneChip>no skills</NoneChip>
+                ) : (
+                  <>
+                    {d.skills.slice(0, 4).map((s) => (
+                      <SkillChip key={s} title={s}>{s}</SkillChip>
+                    ))}
+                    {d.skills.length > 4 && (
+                      <MoreChip title={d.skills.slice(4).join('\n')}>
+                        +{d.skills.length - 4} more
+                      </MoreChip>
+                    )}
+                  </>
+                )}
               </Skills>
               <Version>v{d.version}</Version>
             </RowItem>
@@ -229,11 +300,13 @@ const DefinitionsList: React.FC = () => {
             </Field>
 
             <Field>
-              <label>Skills</label>
+              <label>Skills ({mode.def.skills.length})</label>
               <Skills style={{ marginTop: 4 }}>
-                {mode.def.skills.length === 0 ? <Badge>none</Badge> : mode.def.skills.map((s) => (
-                  <Badge key={s}>{s}</Badge>
-                ))}
+                {mode.def.skills.length === 0 ? (
+                  <NoneChip>no skills</NoneChip>
+                ) : (
+                  mode.def.skills.map((s) => <SkillChip key={s}>{s}</SkillChip>)
+                )}
               </Skills>
             </Field>
 

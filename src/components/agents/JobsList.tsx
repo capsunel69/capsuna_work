@@ -28,17 +28,36 @@ const Header = styled.div`
   color: var(--text-3);
   border-bottom: 1px solid var(--border-1);
   background: var(--bg-1);
+
+  @media (max-width: 900px) { display: none; }
 `;
 
 const RowItem = styled.div`
   display: grid;
   grid-template-columns: 2fr 1.4fr 1fr 1.2fr 1.2fr 100px;
   gap: var(--s-3);
-  padding: 12px var(--s-5);
+  padding: 14px var(--s-5);
   border-bottom: 1px solid var(--border-1);
   align-items: center;
 
   &:last-child { border-bottom: 0; }
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name       action"
+      "instance   instance"
+      "cron       cron"
+      "next       last";
+    row-gap: 8px;
+
+    .cell-name { grid-area: name; }
+    .cell-instance { grid-area: instance; display: flex; flex-direction: row; align-items: center; gap: 8px; }
+    .cell-cron { grid-area: cron; }
+    .cell-next { grid-area: next; }
+    .cell-last { grid-area: last; text-align: right; }
+    .cell-action { grid-area: action; text-align: right; }
+  }
 `;
 
 const Clickable = styled.button`
@@ -183,11 +202,11 @@ const JobsList: React.FC = () => {
             const inst = instanceById.get(j.instanceId);
             return (
               <RowItem key={j.id}>
-                <Clickable onClick={() => setMode({ kind: 'edit', job: j })}>
+                <Clickable className="cell-name" onClick={() => setMode({ kind: 'edit', job: j })}>
                   <strong>{j.name}</strong>
                   <span>{j.payload.input.slice(0, 48)}{j.payload.input.length > 48 ? '…' : ''}</span>
                 </Clickable>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                <div className="cell-instance" style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                   <span style={{ fontSize: 13 }}>{inst?.name ?? '—'}</span>
                   {j.enabled ? (
                     <Badge $variant="success">enabled</Badge>
@@ -195,10 +214,10 @@ const JobsList: React.FC = () => {
                     <Badge>paused</Badge>
                   )}
                 </div>
-                <Cron>{j.cron}</Cron>
-                <Meta>{formatDate(j.nextRunAt)}</Meta>
-                <Meta>{formatDate(j.lastRunAt)}</Meta>
-                <div style={{ textAlign: 'right' }}>
+                <Cron className="cell-cron">{j.cron}</Cron>
+                <Meta className="cell-next">{formatDate(j.nextRunAt)}</Meta>
+                <Meta className="cell-last">{formatDate(j.lastRunAt)}</Meta>
+                <div className="cell-action" style={{ textAlign: 'right' }}>
                   <Button
                     $variant="secondary"
                     $size="sm"

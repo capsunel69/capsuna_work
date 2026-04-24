@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import {
-  Button, Field, FieldGroup, Input, Label, Select, Stack, Textarea, Badge,
+  Button, Field, FieldGroup, Input, Label, Select, Stack, Textarea,
   Spinner,
 } from '../ui/primitives';
-import { IconTrash } from '../ui/icons';
+import { IconTrash, IconSearch, IconCheck } from '../ui/icons';
 import {
   PiovraAPI,
   type AgentDefinition,
@@ -12,43 +12,276 @@ import {
   type SkillDescriptor,
 } from '../../services/piovra';
 
-const MODEL_OPTIONS = [
-  'openai:gpt-4o-mini',
-  'openai:gpt-4o',
-  'openai:gpt-4.1-mini',
-  'anthropic:claude-3-5-haiku-latest',
-  'anthropic:claude-sonnet-4-5',
+interface ModelOption {
+  id: string;
+  label: string;
+  hint?: string;
+}
+
+interface ModelGroup {
+  label: string;
+  models: ModelOption[];
+}
+
+const MODEL_GROUPS: ModelGroup[] = [
+  {
+    label: 'OpenAI · GPT-5 family',
+    models: [
+      { id: 'openai:gpt-5',            label: 'gpt-5',            hint: 'flagship, highest quality' },
+      { id: 'openai:gpt-5-mini',       label: 'gpt-5-mini',       hint: 'balanced quality / cost' },
+      { id: 'openai:gpt-5-nano',       label: 'gpt-5-nano',       hint: 'cheapest, fastest' },
+      { id: 'openai:gpt-5.1',          label: 'gpt-5.1',          hint: 'refreshed flagship' },
+      { id: 'openai:gpt-5.1-mini',     label: 'gpt-5.1-mini' },
+      { id: 'openai:gpt-5.1-codex',    label: 'gpt-5.1-codex',    hint: 'coding-tuned' },
+      { id: 'openai:gpt-5.4',          label: 'gpt-5.4',          hint: 'latest frontier' },
+      { id: 'openai:gpt-5.4-mini',     label: 'gpt-5.4-mini' },
+    ],
+  },
+  {
+    label: 'OpenAI · GPT-4 family',
+    models: [
+      { id: 'openai:gpt-4.1',          label: 'gpt-4.1' },
+      { id: 'openai:gpt-4.1-mini',     label: 'gpt-4.1-mini' },
+      { id: 'openai:gpt-4.1-nano',     label: 'gpt-4.1-nano' },
+      { id: 'openai:gpt-4o',           label: 'gpt-4o' },
+      { id: 'openai:gpt-4o-mini',      label: 'gpt-4o-mini',      hint: 'default — cheap & solid' },
+    ],
+  },
+  {
+    label: 'OpenAI · reasoning',
+    models: [
+      { id: 'openai:o3',               label: 'o3',               hint: 'deep reasoning' },
+      { id: 'openai:o3-mini',          label: 'o3-mini' },
+      { id: 'openai:o4-mini',          label: 'o4-mini' },
+    ],
+  },
+  {
+    label: 'Anthropic · Claude',
+    models: [
+      { id: 'anthropic:claude-opus-4-5',          label: 'claude-opus-4.5',          hint: 'top-tier Anthropic' },
+      { id: 'anthropic:claude-sonnet-4-5',        label: 'claude-sonnet-4.5',        hint: 'balanced flagship' },
+      { id: 'anthropic:claude-3-7-sonnet-latest', label: 'claude-3.7-sonnet' },
+      { id: 'anthropic:claude-3-5-haiku-latest',  label: 'claude-3.5-haiku',         hint: 'fast & cheap' },
+    ],
+  },
 ];
 
-const SkillList = styled.div`
+const DEFAULT_MODEL_ID = 'openai:gpt-4o-mini';
+
+const ALL_MODEL_IDS = MODEL_GROUPS.flatMap((g) => g.models.map((m) => m.id));
+
+/* ── Skill picker ──────────────────────────────────────────────────────── */
+
+const SkillPicker = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 240px;
-  overflow-y: auto;
-  padding: 4px;
+  gap: var(--s-3);
   border: 1px solid var(--border-2);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: var(--bg-1);
+  padding: var(--s-3);
 `;
 
-const SkillRow = styled.label<{ $checked: boolean }>`
+const SearchBar = styled.div`
   display: flex;
-  align-items: flex-start;
-  gap: var(--s-2);
-  padding: 6px 8px;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
   border-radius: var(--r-sm);
+  padding: 0 10px;
+
+  svg { width: 14px; height: 14px; color: var(--text-4); flex-shrink: 0; }
+  input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--text-1);
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 0;
+    &::placeholder { color: var(--text-4); }
+  }
+`;
+
+const SummaryRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 0 2px;
+
+  .count { color: var(--text-1); font-weight: 500; }
+`;
+
+const SummaryActions = styled.div`
+  display: flex;
+  gap: 6px;
+`;
+
+const MiniBtn = styled.button`
+  height: 24px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-2);
   cursor: pointer;
-  font-size: 12.5px;
-  background: ${(p) => (p.$checked ? 'var(--accent-soft)' : 'transparent')};
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 
-  &:hover { background: ${(p) => (p.$checked ? 'var(--accent-soft)' : 'var(--bg-3)')}; }
+  &:hover { background: var(--bg-3); color: var(--text-1); border-color: var(--border-3); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
 
-  input { margin-top: 4px; accent-color: var(--accent); }
+const Groups = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 2px;
 
-  .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .id { font-family: var(--font-mono); color: var(--text-1); }
-  .desc { color: var(--text-3); font-size: 11.5px; }
+  &::-webkit-scrollbar { width: 8px; }
+  &::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+`;
+
+const Group = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  padding: 10px;
+  background: var(--bg-2);
+`;
+
+const GroupHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const GroupName = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+
+  strong {
+    color: var(--text-1);
+    font-weight: 600;
+  }
+`;
+
+const SourcePill = styled.span<{ $source: 'builtin' | 'mcp' }>`
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: ${(p) => (p.$source === 'mcp' ? 'var(--purple-soft)' : 'var(--accent-soft)')};
+  color: ${(p) => (p.$source === 'mcp' ? 'var(--purple)' : 'var(--accent)')};
+`;
+
+const Grid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+`;
+
+const SkillTile = styled.button<{ $checked: boolean }>`
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid ${(p) => (p.$checked ? 'var(--accent)' : 'var(--border-1)')};
+  background: ${(p) => (p.$checked ? 'var(--accent-soft)' : 'var(--bg-1)')};
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  position: relative;
+
+  &:hover {
+    background: ${(p) => (p.$checked ? 'var(--accent-soft)' : 'var(--bg-3)')};
+    border-color: ${(p) => (p.$checked ? 'var(--accent)' : 'var(--border-2)')};
+  }
+  &:active { transform: scale(0.98); }
+`;
+
+const Checkbox = styled.div<{ $checked: boolean }>`
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid ${(p) => (p.$checked ? 'var(--accent)' : 'var(--border-3)')};
+  background: ${(p) => (p.$checked ? 'var(--accent)' : 'transparent')};
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background 0.15s, border-color 0.15s;
+
+  svg {
+    width: 11px;
+    height: 11px;
+    color: #06121d;
+    stroke-width: 3;
+    opacity: ${(p) => (p.$checked ? 1 : 0)};
+    transition: opacity 0.1s;
+  }
+`;
+
+const SkillMeta = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+
+  .id {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-1);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desc {
+    font-size: 11px;
+    color: var(--text-3);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+`;
+
+const ConfirmBadge = styled.span`
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  margin-left: 4px;
 `;
 
 const Footer = styled.div`
@@ -67,6 +300,14 @@ const ErrorNote = styled.div`
   font-size: 12px;
 `;
 
+const EmptySearch = styled.div`
+  padding: 24px;
+  text-align: center;
+  color: var(--text-4);
+  font-size: 12px;
+  font-style: italic;
+`;
+
 interface AgentFormProps {
   existing?: AgentDefinition | null;
   onSaved: (def: AgentDefinition) => void;
@@ -74,10 +315,21 @@ interface AgentFormProps {
   onCancel: () => void;
 }
 
+/**
+ * Bucket a skill id into a group label. Groups are namespaced by everything up
+ * to (but not including) the last `.` segment — e.g. `capsuna.tasks.create` →
+ * `capsuna.tasks`. Single-segment ids (like `echo`) live under `general`.
+ */
+function groupKey(id: string): string {
+  const parts = id.split('.');
+  if (parts.length <= 1) return 'general';
+  return parts.slice(0, -1).join('.');
+}
+
 const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onCancel }) => {
   const [name, setName] = useState(existing?.name ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
-  const [model, setModel] = useState(existing?.model ?? MODEL_OPTIONS[0]);
+  const [model, setModel] = useState(existing?.model ?? DEFAULT_MODEL_ID);
   const [systemPrompt, setSystemPrompt] = useState(existing?.systemPrompt ?? '');
   const [temperature, setTemperature] = useState<string>(
     existing?.temperature != null ? String(existing.temperature) : '0.2',
@@ -89,6 +341,7 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
     new Set(existing?.skills ?? []),
   );
   const [allSkills, setAllSkills] = useState<SkillDescriptor[] | null>(null);
+  const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -100,15 +353,31 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
     return () => { cancelled = true; };
   }, []);
 
-  const groupedSkills = useMemo(() => {
+  const groups = useMemo(() => {
     if (!allSkills) return [];
-    const builtin = allSkills.filter((s) => s.source === 'builtin');
-    const mcp = allSkills.filter((s) => s.source === 'mcp');
-    return [
-      { label: 'Built-in', items: builtin },
-      { label: 'MCP', items: mcp },
-    ].filter((g) => g.items.length > 0);
-  }, [allSkills]);
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? allSkills.filter(
+          (s) =>
+            s.id.toLowerCase().includes(q) ||
+            s.description.toLowerCase().includes(q),
+        )
+      : allSkills;
+
+    const buckets = new Map<string, { key: string; source: 'builtin' | 'mcp'; items: SkillDescriptor[] }>();
+    for (const s of filtered) {
+      const k = groupKey(s.id);
+      const compositeKey = `${s.source}:${k}`;
+      if (!buckets.has(compositeKey)) {
+        buckets.set(compositeKey, { key: k, source: s.source, items: [] });
+      }
+      buckets.get(compositeKey)!.items.push(s);
+    }
+    return Array.from(buckets.values()).sort((a, b) => {
+      if (a.source !== b.source) return a.source === 'builtin' ? -1 : 1;
+      return a.key.localeCompare(b.key);
+    });
+  }, [allSkills, search]);
 
   const toggleSkill = (id: string): void => {
     setSelectedSkills((prev) => {
@@ -118,6 +387,24 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
       return next;
     });
   };
+
+  const selectAllInGroup = (ids: string[], select: boolean): void => {
+    setSelectedSkills((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (select) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = (): void => {
+    if (!allSkills) return;
+    setSelectedSkills(new Set(allSkills.map((s) => s.id)));
+  };
+
+  const clearAll = (): void => setSelectedSkills(new Set());
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -157,6 +444,9 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
     }
   };
 
+  const totalSkills = allSkills?.length ?? 0;
+  const selectedCount = selectedSkills.size;
+
   return (
     <form onSubmit={handleSubmit}>
       <Stack $gap={4}>
@@ -185,7 +475,20 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
           <Field>
             <Label>Model</Label>
             <Select value={model} onChange={(e) => setModel(e.target.value)}>
-              {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+              {MODEL_GROUPS.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}{m.hint ? ` — ${m.hint}` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {!ALL_MODEL_IDS.includes(model) && (
+                <optgroup label="Custom / legacy">
+                  <option value={model}>{model}</option>
+                </optgroup>
+              )}
             </Select>
           </Field>
           <Field>
@@ -223,48 +526,92 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
         </Field>
 
         <Field>
-          <Label>Allowed skills ({selectedSkills.size})</Label>
+          <Label>Allowed skills</Label>
           {!allSkills ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)' }}>
               <Spinner $size={14} /> Loading skill registry…
             </div>
           ) : (
-            <SkillList>
-              {groupedSkills.map((group) => (
-                <React.Fragment key={group.label}>
-                  <div style={{
-                    fontSize: 10.5,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text-4)',
-                    padding: '6px 8px 2px',
-                  }}>
-                    {group.label}
-                  </div>
-                  {group.items.map((s) => {
-                    const checked = selectedSkills.has(s.id);
+            <SkillPicker>
+              <SearchBar>
+                <IconSearch />
+                <input
+                  type="text"
+                  placeholder="Search skills…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </SearchBar>
+
+              <SummaryRow>
+                <span>
+                  <span className="count">{selectedCount}</span> of {totalSkills} selected
+                </span>
+                <SummaryActions>
+                  <MiniBtn type="button" onClick={selectAll} disabled={selectedCount === totalSkills}>
+                    Select all
+                  </MiniBtn>
+                  <MiniBtn type="button" onClick={clearAll} disabled={selectedCount === 0}>
+                    Clear
+                  </MiniBtn>
+                </SummaryActions>
+              </SummaryRow>
+
+              <Groups>
+                {groups.length === 0 ? (
+                  <EmptySearch>No skills match "{search}"</EmptySearch>
+                ) : (
+                  groups.map((g) => {
+                    const ids = g.items.map((s) => s.id);
+                    const allSelected = ids.every((id) => selectedSkills.has(id));
+                    const someSelected = !allSelected && ids.some((id) => selectedSkills.has(id));
                     return (
-                      <SkillRow key={s.id} $checked={checked}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSkill(s.id)}
-                        />
-                        <span className="meta">
-                          <span className="id">
-                            {s.id}
-                            {s.requiresConfirmation && (
-                              <Badge $variant="warning" style={{ marginLeft: 6 }}>confirm</Badge>
-                            )}
-                          </span>
-                          <span className="desc">{s.description}</span>
-                        </span>
-                      </SkillRow>
+                      <Group key={`${g.source}:${g.key}`}>
+                        <GroupHeader>
+                          <GroupName>
+                            <SourcePill $source={g.source}>{g.source}</SourcePill>
+                            <strong>{g.key}</strong>
+                            <span>· {g.items.length}</span>
+                          </GroupName>
+                          <MiniBtn
+                            type="button"
+                            onClick={() => selectAllInGroup(ids, !allSelected)}
+                          >
+                            {allSelected ? 'Clear' : someSelected ? 'Select rest' : 'Select all'}
+                          </MiniBtn>
+                        </GroupHeader>
+                        <Grid>
+                          {g.items.map((s) => {
+                            const checked = selectedSkills.has(s.id);
+                            const shortId = s.id.split('.').pop() ?? s.id;
+                            return (
+                              <SkillTile
+                                key={s.id}
+                                $checked={checked}
+                                type="button"
+                                onClick={() => toggleSkill(s.id)}
+                                title={s.id}
+                              >
+                                <Checkbox $checked={checked}>
+                                  <IconCheck />
+                                </Checkbox>
+                                <SkillMeta>
+                                  <span className="id">
+                                    {shortId}
+                                    {s.requiresConfirmation && <ConfirmBadge>confirm</ConfirmBadge>}
+                                  </span>
+                                  <span className="desc">{s.description}</span>
+                                </SkillMeta>
+                              </SkillTile>
+                            );
+                          })}
+                        </Grid>
+                      </Group>
                     );
-                  })}
-                </React.Fragment>
-              ))}
-            </SkillList>
+                  })
+                )}
+              </Groups>
+            </SkillPicker>
           )}
         </Field>
 

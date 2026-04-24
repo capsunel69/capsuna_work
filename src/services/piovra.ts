@@ -216,10 +216,23 @@ export const PiovraAPI = {
     const wrappedOpts: OrchestrateOptions = { ...opts, onStep: wrappedOnStep };
 
     try {
+      const timezone = (() => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+          return undefined;
+        }
+      })();
+
       const res = await fetch(`${BASE_URL}/orchestrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ input: opts.input, instanceId: opts.instanceId }),
+        body: JSON.stringify({
+          input: opts.input,
+          instanceId: opts.instanceId,
+          clientTime: new Date().toISOString(),
+          timezone,
+        }),
         signal: opts.signal,
       });
       if (!res.ok || !res.body) {
