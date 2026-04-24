@@ -300,6 +300,59 @@ const EmptySearch = styled.div`
   font-style: italic;
 `;
 
+const StaleBanner = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--text-1);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 12px;
+
+  .title {
+    font-weight: 600;
+    color: var(--warning);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+`;
+
+const StalePill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-2);
+  border: 1px solid var(--border-2);
+
+  button {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    &:hover { color: var(--danger); }
+  }
+`;
+
 interface AgentFormProps {
   existing?: AgentDefinition | null;
   onSaved: (def: AgentDefinition) => void;
@@ -436,8 +489,25 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
     }
   };
 
+  const availableIds = useMemo(
+    () => new Set((allSkills ?? []).map((s) => s.id)),
+    [allSkills],
+  );
+  const staleIds = useMemo(
+    () => (allSkills ? Array.from(selectedSkills).filter((id) => !availableIds.has(id)) : []),
+    [allSkills, selectedSkills, availableIds],
+  );
   const totalSkills = allSkills?.length ?? 0;
-  const selectedCount = selectedSkills.size;
+  const selectedActiveCount = Array.from(selectedSkills).filter((id) => availableIds.has(id)).length;
+
+  const removeStale = (id?: string): void => {
+    setSelectedSkills((prev) => {
+      const next = new Set(prev);
+      if (id) next.delete(id);
+      else for (const s of staleIds) next.delete(s);
+      return next;
+    });
+  };
 
   return (
     <form onSubmit={handleSubmit}>
@@ -537,17 +607,50 @@ const AgentForm: React.FC<AgentFormProps> = ({ existing, onSaved, onDeleted, onC
 
               <SummaryRow>
                 <span>
-                  <span className="count">{selectedCount}</span> of {totalSkills} selected
+                  <span className="count">{selectedActiveCount}</span> of {totalSkills} selected
+                  {staleIds.length > 0 && (
+                    <>
+                      {' '}· <span style={{ color: 'var(--warning)' }}>{staleIds.length} stale</span>
+                    </>
+                  )}
                 </span>
                 <SummaryActions>
-                  <MiniBtn type="button" onClick={selectAll} disabled={selectedCount === totalSkills}>
+                  <MiniBtn type="button" onClick={selectAll} disabled={selectedActiveCount === totalSkills}>
                     Select all
                   </MiniBtn>
-                  <MiniBtn type="button" onClick={clearAll} disabled={selectedCount === 0}>
+                  <MiniBtn type="button" onClick={clearAll} disabled={selectedSkills.size === 0}>
                     Clear
                   </MiniBtn>
                 </SummaryActions>
               </SummaryRow>
+
+              {staleIds.length > 0 && (
+                <StaleBanner>
+                  <div className="title">
+                    <span>
+                      {staleIds.length} selected skill{staleIds.length === 1 ? '' : 's'} no longer
+                      exist in the registry
+                    </span>
+                    <MiniBtn type="button" onClick={() => removeStale()}>
+                      Remove all
+                    </MiniBtn>
+                  </div>
+                  <div className="ids">
+                    {staleIds.map((id) => (
+                      <StalePill key={id} title={id}>
+                        {id}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${id}`}
+                          onClick={() => removeStale(id)}
+                        >
+                          ×
+                        </button>
+                      </StalePill>
+                    ))}
+                  </div>
+                </StaleBanner>
+              )}
 
               <Groups>
                 {groups.length === 0 ? (
