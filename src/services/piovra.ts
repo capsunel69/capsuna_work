@@ -132,6 +132,10 @@ export interface OrchestrateOptions {
   /** Prior turns in this chat thread (oldest first). Lets the agent resolve
    * referents like "that task" without server-side thread persistence. */
   history?: ChatHistoryMessage[];
+  /** Live workspace snapshot (active tasks, recently completed, meetings,
+   * reminders). Appended to the system prompt for this turn so the agent
+   * can act without first calling list skills. */
+  context?: string;
   /** How long to keep polling after the SSE stream drops before giving up.
    * Defaults to 10 minutes — enough for Netlify Pro (10m) and most long runs. */
   pollTimeoutMs?: number;
@@ -241,6 +245,7 @@ export const PiovraAPI = {
           clientTime: new Date().toISOString(),
           timezone,
           history: opts.history,
+          context: opts.context,
         }),
         signal: opts.signal,
       });

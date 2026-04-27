@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { PiovraAPI, type AgentStep, type ChatHistoryMessage } from '../services/piovra';
 import { useAppContext } from '../context/AppContext';
+import type { Meeting, Reminder, Task } from '../types';
 
 export type ChatStatus = 'idle' | 'streaming' | 'error';
 
@@ -29,22 +30,37 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [status, setStatus] = useState<ChatStatus>('idle');
   const abortRef = useRef<AbortController | null>(null);
-  const { refreshTasks, refreshMeetings, refreshReminders } = useAppContext();
+  const { tasks, meetings, reminders, refreshTasks, refreshMeetings, refreshReminders } =
+    useAppContext();
+
+  // Keep the latest workspace data in refs so `send` (a stable callback)
+  // always builds the snapshot from up-to-date state without forcing the
+  // callback to re-create on every tasks/meetings/reminders mutation.
+  const tasksRef = useRef<Task[]>(tasks);
+  const meetingsRef = useRef<Meeting[]>(meetings);
+  const remindersRef = useRef<Reminder[]>(reminders);
+  tasksRef.current = tasks;
+  meetingsRef.current = meetings;
+  remindersRef.current = reminders;
 
   /**
    * Watch each agent step. When the agent calls a `capsuna.*` mutation skill
    * (anything except `.list`) and gets a successful tool_result back, refresh
    * the matching resource so the rest of the UI shows the change live.
+   *
+   * Note: the AI SDK normalises skill ids by replacing dots with underscores
+   * (so `capsuna.tasks.create` arrives as `capsuna_tasks_create`). We compare
+   * on the normalised form to keep things robust either way.
    */
   const reactToStep = useCallback(
     (step: AgentStep): void => {
       if (step.kind !== 'tool_result') return;
-      const skill = step.skill ?? '';
-      if (!skill.startsWith('capsuna.')) return;
-      if (skill.endsWith('.list')) return;
-      if (skill.startsWith('capsuna.tasks.')) void refreshTasks();
-      else if (skill.startsWith('capsuna.meetings.')) void refreshMeetings();
-      else if (skill.startsWith('capsuna.reminders.')) void refreshReminders();
+      const skill = (step.skill ?? '').replace(/\./g, '_');
+      if (!skill.startsWith('capsuna_')) return;
+      if (skill.endsWith('_list')) return;
+      if (skill.startsWith('capsuna_tasks_')) void refreshTasks();
+      else if (skill.startsWith('capsuna_meetings_')) void refreshMeetings();
+      else if (skill.startsWith('capsuna_reminders_')) void refreshReminders();
     },
     [refreshTasks, refreshMeetings, refreshReminders],
   );
@@ -68,6 +84,11 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
       if (!trimmed) return;
 
       const history = buildHistory(turnsRef.current);
+      const context = buildContextSnapshot({
+        tasks: tasksRef.current,
+        meetings: meetingsRef.current,
+        reminders: remindersRef.current,
+      });
 
       const turnId = crypto.randomUUID();
       const newTurn: ChatTurn = {
@@ -93,6 +114,7 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
           input: trimmed,
           instanceId,
           history,
+          context,
           signal: controller.signal,
           onStep: (step) => {
             appendStep(turnId, step);
@@ -176,4 +198,117 @@ function lastAssistantText(steps: AgentStep[]): string {
     }
   }
   return '';
+}
+
+/**
+ * Build a compact text snapshot of the user's current workspace, sent with
+ * every orchestrate call so the agent can resolve referents and act
+ * directly without first calling capsuna_*_list. Includes:
+ *   - all active tasks (with id, priority, dueDate, description preview)
+ *   - tasks completed in the last 2 days
+ *   - meetings within ±2 days of now
+ *   - all active reminders
+ *
+ * IDs are the `id` field (uuid) used by the Capsuna API — exactly what
+ * capsuna_*_update / _complete / _delete skills expect.
+ */
+function buildContextSnapshot(params: {
+  tasks: Task[];
+  meetings: Meeting[];
+  reminders: Reminder[];
+}): string {
+  const { tasks, meetings, reminders } = params;
+
+  const now = new Date();
+  const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+  const recentCutoff = new Date(now.getTime() - TWO_DAYS_MS);
+  const upcomingCutoff = new Date(now.getTime() + TWO_DAYS_MS);
+
+  const sections: string[] = [];
+
+  const activeTasks = tasks.filter((t) => !t.completed);
+  if (activeTasks.length > 0) {
+    sections.push(
+      `Active tasks (${activeTasks.length}):\n` +
+        activeTasks.map(formatTaskLine).join('\n'),
+    );
+  } else {
+    sections.push('Active tasks: (none)');
+  }
+
+  const recentlyDone = tasks.filter(
+    (t) => t.completed && t.completedAt && new Date(t.completedAt) >= recentCutoff,
+  );
+  if (recentlyDone.length > 0) {
+    sections.push(
+      `Recently completed tasks (last 2 days, ${recentlyDone.length}):\n` +
+        recentlyDone.map(formatTaskLine).join('\n'),
+    );
+  }
+
+  const relevantMeetings = meetings.filter((m) => {
+    if (!m.date) return false;
+    const d = new Date(m.date);
+    return d >= recentCutoff && d <= upcomingCutoff;
+  });
+  if (relevantMeetings.length > 0) {
+    sections.push(
+      `Meetings within ±2 days (${relevantMeetings.length}):\n` +
+        relevantMeetings.map(formatMeetingLine).join('\n'),
+    );
+  }
+
+  const activeReminders = reminders.filter((r) => !r.completed);
+  if (activeReminders.length > 0) {
+    sections.push(
+      `Active reminders (${activeReminders.length}):\n` +
+        activeReminders.map(formatReminderLine).join('\n'),
+    );
+  }
+
+  if (sections.length === 0) return '';
+  return sections.join('\n\n');
+}
+
+function formatTaskLine(t: Task): string {
+  const parts: string[] = [`- [${t.id}] "${oneLine(t.title)}"`];
+  parts.push(`priority=${t.priority}`);
+  parts.push(`completed=${t.completed}`);
+  if (t.dueDate) parts.push(`dueDate=${toIso(t.dueDate)}`);
+  if (t.completedAt) parts.push(`completedAt=${toIso(t.completedAt)}`);
+  if (t.description?.trim()) parts.push(`description="${truncate(oneLine(t.description), 160)}"`);
+  return parts.join(' · ');
+}
+
+function formatMeetingLine(m: Meeting): string {
+  const parts: string[] = [`- [${m.id}] "${oneLine(m.title)}"`];
+  if (m.date) parts.push(`date=${toIso(m.date)}`);
+  if (typeof m.duration === 'number') parts.push(`duration=${m.duration}m`);
+  parts.push(`completed=${m.completed}`);
+  if (m.participants?.length) parts.push(`participants=${m.participants.length}`);
+  return parts.join(' · ');
+}
+
+function formatReminderLine(r: Reminder): string {
+  const parts: string[] = [`- [${r.id}] "${oneLine(r.title)}"`];
+  if (r.date) parts.push(`date=${toIso(r.date)}`);
+  if (r.recurring) parts.push(`recurring=${r.recurring}`);
+  parts.push(`completed=${r.completed}`);
+  return parts.join(' · ');
+}
+
+function oneLine(s: string): string {
+  return (s ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+function toIso(d: Date | string): string {
+  try {
+    return new Date(d).toISOString();
+  } catch {
+    return String(d);
+  }
 }
