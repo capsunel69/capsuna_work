@@ -75,6 +75,28 @@ const ToolCard = styled.div`
   }
 `;
 
+const MailPreview = styled.div`
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  color: var(--text-1);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 320px;
+  overflow: auto;
+`;
+
+const MailMeta = styled.div`
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+`;
+
 const ErrorBanner = styled.div`
   background: var(--danger-soft);
   color: var(--danger);
@@ -103,6 +125,73 @@ const formatJSON = (value: unknown): string => {
     return String(value);
   }
 };
+
+/** Surface Gmail content above raw JSON so users actually see the mail. */
+function GmailResultPreview({ skill, result }: { skill: string; result: unknown }): React.ReactNode {
+  if (result === null || result === undefined || typeof result !== 'object') return null;
+  const s = skill.replace(/\./g, '_');
+  const o = result as Record<string, unknown>;
+
+  if (s.includes('gmail_messages_list')) {
+    const messages = o.messages;
+    if (!Array.isArray(messages)) return null;
+    if (messages.length === 0) {
+      return <MailPreview>No messages matched this search (empty inbox for this filter).</MailPreview>;
+    }
+    return (
+      <>
+        {messages.map((row, i) => {
+          const m = row as {
+            subject?: string | null;
+            from?: string | null;
+            bodyText?: string | null;
+            snippet?: string | null;
+            date?: string | null;
+          };
+          const body = (m.bodyText && m.bodyText.trim()) || (m.snippet && m.snippet.trim()) || '—';
+          const sub = m.subject || '(no subject)';
+          const from = m.from || '';
+          const when = m.date || '';
+          return (
+            <MailPreview key={i}>
+              <MailMeta>
+                {from}
+                {when ? ` · ${when}` : ''}
+              </MailMeta>
+              <strong style={{ color: 'var(--text-1)' }}>{sub}</strong>
+              {'\n\n'}
+              {body}
+            </MailPreview>
+          );
+        })}
+      </>
+    );
+  }
+
+  if (s.includes('gmail_messages_get')) {
+    const m = o as {
+      subject?: string | null;
+      from?: string | null;
+      bodyText?: string | null;
+      snippet?: string | null;
+      date?: string | null;
+    };
+    const body = (m.bodyText && m.bodyText.trim()) || (m.snippet && m.snippet.trim());
+    if (!m.subject && !body) return null;
+    return (
+      <MailPreview>
+        <MailMeta>
+          {m.from || ''}
+          {m.date ? ` · ${m.date}` : ''}
+        </MailMeta>
+        <strong style={{ color: 'var(--text-1)' }}>{m.subject || '(no subject)'}</strong>
+        {body ? `\n\n${body}` : ''}
+      </MailPreview>
+    );
+  }
+
+  return null;
+}
 
 interface StepCardProps {
   step: AgentStep;
@@ -140,8 +229,10 @@ const StepCard: React.FC<StepCardProps> = ({ step }) => {
       const raw = formatJSON(step.result);
       const long = raw.length > 240;
       const shown = long && !expanded ? raw.slice(0, 240) + '…' : raw;
+      const preview = step.skill ? GmailResultPreview({ skill: step.skill, result: step.result }) : null;
       return (
         <ToolCard>
+          {preview}
           <header>
             <Badge $variant="success">result</Badge>
             <span className="skill">{step.skill}</span>

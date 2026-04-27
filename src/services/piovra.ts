@@ -321,7 +321,10 @@ function handleEvent(raw: string, opts: OrchestrateOptions, state: OrchestrateSt
   let data: unknown;
   try {
     data = JSON.parse(dataLines.join('\n'));
-  } catch {
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn('[piovra] SSE data JSON parse failed', err, dataLines.join('\n').slice(0, 500));
+    }
     return;
   }
 
