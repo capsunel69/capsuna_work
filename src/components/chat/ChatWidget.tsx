@@ -98,51 +98,39 @@ const HoverRevealWrap = styled(BubbleWrap)`
   }
 `;
 
-/* ── Drawer ────────────────────────────────────────────────────────────── */
+/* ── Popup ─────────────────────────────────────────────────────────────── */
 
-const slideIn = keyframes`
-  from { transform: translateX(16px); opacity: 0; }
-  to   { transform: translateX(0);     opacity: 1; }
-`;
-
-const fadeIn = keyframes`
-  from { opacity: 0; }
-  to   { opacity: 1; }
-`;
-
-const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 180;
-  background: rgba(2, 4, 8, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  animation: ${fadeIn} 0.18s ease-out;
+const popIn = keyframes`
+  from { transform: translateY(12px) scale(0.98); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);    opacity: 1; }
 `;
 
 const Panel = styled.aside`
   position: fixed;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
-  width: min(460px, calc(100vw - 24px));
+  right: 22px;
+  bottom: 22px;
+  width: min(420px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 120px));
   background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
   border: 1px solid var(--border-2);
   border-radius: var(--r-lg);
-  box-shadow: -24px 24px 72px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(76, 194, 255, 0.05);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(76, 194, 255, 0.05);
   display: flex;
   flex-direction: column;
   z-index: 181;
-  animation: ${slideIn} 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: ${popIn} 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   overflow: hidden;
+  transform-origin: bottom right;
 
   @media (max-width: 720px) {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 100vw;
-    border-radius: 0;
-    border: none;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    height: min(80vh, calc(100vh - 80px));
   }
 `;
 
@@ -522,139 +510,136 @@ const ChatWidget: React.FC = () => {
       </HoverRevealWrap>
 
       {isOpen && (
-        <>
-          <Overlay onClick={close} />
-          <Panel role="dialog" aria-modal="true" aria-label="Assistant">
-            <GradientBar />
-            <Header>
-              <TitleBlock>
-                <Avatar>
-                  <IconBot />
-                </Avatar>
-                <TitleText>
-                  <strong>Piovra</strong>
-                  <span>
-                    <LiveDot $live={!streaming} />
-                    {streaming
-                      ? 'thinking…'
-                      : turns.length
-                        ? `${turns.length} turn${turns.length === 1 ? '' : 's'}`
-                        : 'ready'}
-                  </span>
-                </TitleText>
-              </TitleBlock>
-              <HeaderActions>
-                {instanceId && (
-                  <HeaderChip
-                    type="button"
-                    onClick={() => setInstanceId(undefined)}
-                    title="Switch back to default instance"
-                  >
-                    inst {instanceId.slice(0, 6)} ×
-                  </HeaderChip>
-                )}
-                {turns.length > 0 && (
-                  <HeaderChip type="button" onClick={reset} title="Reset conversation">
-                    <IconRefresh />
-                    Reset
-                  </HeaderChip>
-                )}
-                <IconButton $variant="ghost" onClick={close} aria-label="Close">
-                  <IconX />
-                </IconButton>
-              </HeaderActions>
-            </Header>
-
-            <Scroller ref={scrollRef}>
-              {turns.length === 0 ? (
-                <EmptyWrap>
-                  <EmptyAvatar>
-                    <IconBot />
-                  </EmptyAvatar>
-                  <EmptyTitle>How can I help?</EmptyTitle>
-                  <EmptyHint>
-                    I can add tasks, schedule meetings, set reminders, and look things up. Try one
-                    of these:
-                  </EmptyHint>
-                  <Suggestions>
-                    {SUGGESTIONS.map((s) => (
-                      <SuggestionChip
-                        key={s}
-                        type="button"
-                        onClick={() => submitSuggestion(s)}
-                        disabled={streaming}
-                      >
-                        {s}
-                      </SuggestionChip>
-                    ))}
-                  </Suggestions>
-                </EmptyWrap>
-              ) : (
-                turns.map((turn) => (
-                  <Turn key={turn.id}>
-                    <UserLine>{turn.input}</UserLine>
-                    <AgentColumn>
-                      {turn.steps.map((step, i) => (
-                        <StepCard key={i} step={step} />
-                      ))}
-                      {turn.status === 'streaming' && (
-                        <TurnFooter>
-                          <Spinner $size={12} /> thinking…
-                        </TurnFooter>
-                      )}
-                      {turn.error && (
-                        <TurnFooter style={{ color: 'var(--danger)' }}>{turn.error}</TurnFooter>
-                      )}
-                      {turn.status === 'idle' && turn.runId && (
-                        <TurnFooter>
-                          <span>run {turn.runId.slice(0, 8)}</span>
-                          {turn.tokensIn !== null && <span>in {turn.tokensIn}</span>}
-                          {turn.tokensOut !== null && <span>out {turn.tokensOut}</span>}
-                        </TurnFooter>
-                      )}
-                    </AgentColumn>
-                  </Turn>
-                ))
+        <Panel role="dialog" aria-label="Assistant">
+          <GradientBar />
+          <Header>
+            <TitleBlock>
+              <Avatar>
+                <IconBot />
+              </Avatar>
+              <TitleText>
+                <strong>Piovra</strong>
+                <span>
+                  <LiveDot $live={!streaming} />
+                  {streaming
+                    ? 'thinking…'
+                    : turns.length
+                      ? `${turns.length} turn${turns.length === 1 ? '' : 's'}`
+                      : 'ready'}
+                </span>
+              </TitleText>
+            </TitleBlock>
+            <HeaderActions>
+              {instanceId && (
+                <HeaderChip
+                  type="button"
+                  onClick={() => setInstanceId(undefined)}
+                  title="Switch back to default instance"
+                >
+                  inst {instanceId.slice(0, 6)} ×
+                </HeaderChip>
               )}
-            </Scroller>
+              {turns.length > 0 && (
+                <HeaderChip type="button" onClick={reset} title="Reset conversation">
+                  <IconRefresh />
+                  Reset
+                </HeaderChip>
+              )}
+              <IconButton $variant="ghost" onClick={close} aria-label="Close">
+                <IconX />
+              </IconButton>
+            </HeaderActions>
+          </Header>
 
-            <ComposerBar onSubmit={handleSubmit}>
-              <div style={{ flex: 1 }}>
-                <TextInputWrap $focused={focused} $disabled={streaming}>
-                  <TextInput
-                    ref={textareaRef}
-                    placeholder="Message Piovra…"
-                    value={value}
-                    onChange={(e) => {
-                      setValue(e.target.value);
-                      autoGrow(e.currentTarget);
-                    }}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
-                    onKeyDown={handleKey}
-                    rows={1}
-                    disabled={streaming}
-                  />
-                  {streaming ? (
-                    <SendButton type="button" $variant="stop" onClick={abort} aria-label="Stop">
-                      <IconStop />
-                    </SendButton>
-                  ) : (
-                    <SendButton
-                      type="submit"
-                      $variant="send"
-                      disabled={!value.trim()}
-                      aria-label="Send"
+          <Scroller ref={scrollRef}>
+            {turns.length === 0 ? (
+              <EmptyWrap>
+                <EmptyAvatar>
+                  <IconBot />
+                </EmptyAvatar>
+                <EmptyTitle>How can I help?</EmptyTitle>
+                <EmptyHint>
+                  I can add tasks, schedule meetings, set reminders, and look things up. Try one
+                  of these:
+                </EmptyHint>
+                <Suggestions>
+                  {SUGGESTIONS.map((s) => (
+                    <SuggestionChip
+                      key={s}
+                      type="button"
+                      onClick={() => submitSuggestion(s)}
+                      disabled={streaming}
                     >
-                      <IconSend />
-                    </SendButton>
-                  )}
-                </TextInputWrap>
-                <Hint>Enter to send · Shift+Enter for newline · Esc to close</Hint>
-              </div>
-            </ComposerBar>
-          </Panel>
-        </>
+                      {s}
+                    </SuggestionChip>
+                  ))}
+                </Suggestions>
+              </EmptyWrap>
+            ) : (
+              turns.map((turn) => (
+                <Turn key={turn.id}>
+                  <UserLine>{turn.input}</UserLine>
+                  <AgentColumn>
+                    {turn.steps.map((step, i) => (
+                      <StepCard key={i} step={step} />
+                    ))}
+                    {turn.status === 'streaming' && (
+                      <TurnFooter>
+                        <Spinner $size={12} /> thinking…
+                      </TurnFooter>
+                    )}
+                    {turn.error && (
+                      <TurnFooter style={{ color: 'var(--danger)' }}>{turn.error}</TurnFooter>
+                    )}
+                    {turn.status === 'idle' && turn.runId && (
+                      <TurnFooter>
+                        <span>run {turn.runId.slice(0, 8)}</span>
+                        {turn.tokensIn !== null && <span>in {turn.tokensIn}</span>}
+                        {turn.tokensOut !== null && <span>out {turn.tokensOut}</span>}
+                      </TurnFooter>
+                    )}
+                  </AgentColumn>
+                </Turn>
+              ))
+            )}
+          </Scroller>
+
+          <ComposerBar onSubmit={handleSubmit}>
+            <div style={{ flex: 1 }}>
+              <TextInputWrap $focused={focused} $disabled={streaming}>
+                <TextInput
+                  ref={textareaRef}
+                  placeholder="Message Piovra…"
+                  value={value}
+                  onChange={(e) => {
+                    setValue(e.target.value);
+                    autoGrow(e.currentTarget);
+                  }}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  onKeyDown={handleKey}
+                  rows={1}
+                  disabled={streaming}
+                />
+                {streaming ? (
+                  <SendButton type="button" $variant="stop" onClick={abort} aria-label="Stop">
+                    <IconStop />
+                  </SendButton>
+                ) : (
+                  <SendButton
+                    type="submit"
+                    $variant="send"
+                    disabled={!value.trim()}
+                    aria-label="Send"
+                  >
+                    <IconSend />
+                  </SendButton>
+                )}
+              </TextInputWrap>
+              <Hint>Enter to send · Shift+Enter for newline · Esc to close</Hint>
+            </div>
+          </ComposerBar>
+        </Panel>
       )}
     </>
   );
