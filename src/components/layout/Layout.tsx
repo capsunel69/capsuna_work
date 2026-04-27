@@ -4,7 +4,6 @@ import styled from 'styled-components';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
-import StickyNote from '../notes/StickyNote';
 import BackgroundFx from './BackgroundFx';
 import ChatWidget from '../chat/ChatWidget';
 import {
@@ -25,6 +24,7 @@ const NAV_PRIMARY: NavItem[] = [
   { to: '/tasks',     label: 'Tasks',     icon: IconTasks },
   { to: '/meetings',  label: 'Meetings',  icon: IconCalendar },
   { to: '/reminders', label: 'Reminders', icon: IconBell },
+  { to: '/notes',     label: 'Notes',     icon: IconNote },
   { to: '/agents',    label: 'Agents',    icon: IconBot },
 ];
 
@@ -281,8 +281,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('sidebarCollapsed') === '1';
   });
-  const [showNotes, setShowNotes] = useState(false);
-
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
   }, [collapsed]);
@@ -337,9 +335,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </Nav>
 
         <SidebarFooter>
-          <FooterButton $collapsed={collapsed} onClick={() => setShowNotes(true)} title={collapsed ? 'Notes' : undefined}>
-            <IconNote /> <span className="label">Notes</span>
-          </FooterButton>
           <FooterButton $collapsed={collapsed} onClick={handleLogout} title={collapsed ? 'Sign out' : undefined}>
             <IconLogout /> <span className="label">Sign out</span>
           </FooterButton>
@@ -384,7 +379,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </Main>
 
       <StickyLayer>
-        {showNotes && <StickyNote onClose={() => setShowNotes(false)} />}
         <ChatWidget />
       </StickyLayer>
     </Shell>
