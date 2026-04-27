@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { PiovraAPI, type AgentStep, type ChatHistoryMessage, type OrchestrateUserImage } from '../services/piovra';
 import { useAppContext } from '../context/AppContext';
-import type { Meeting, Reminder, Task } from '../types';
+import type { Journal, Meeting, Reminder, Task } from '../types';
 
 export type ChatStatus = 'idle' | 'streaming' | 'error';
 
@@ -32,7 +32,7 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [status, setStatus] = useState<ChatStatus>('idle');
   const abortRef = useRef<AbortController | null>(null);
-  const { tasks, meetings, reminders, refreshTasks, refreshMeetings, refreshReminders } =
+  const { tasks, meetings, reminders, journals, refreshTasks, refreshMeetings, refreshReminders, refreshJournals } =
     useAppContext();
 
   // Keep the latest workspace data in refs so `send` (a stable callback)
@@ -41,9 +41,11 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
   const tasksRef = useRef<Task[]>(tasks);
   const meetingsRef = useRef<Meeting[]>(meetings);
   const remindersRef = useRef<Reminder[]>(reminders);
+  const journalsRef = useRef<Journal[]>(journals);
   tasksRef.current = tasks;
   meetingsRef.current = meetings;
   remindersRef.current = reminders;
+  journalsRef.current = journals;
 
   /**
    * Watch each agent step. When the agent calls a `capsuna.*` mutation skill
@@ -63,8 +65,9 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
       if (skill.startsWith('capsuna_tasks_')) void refreshTasks();
       else if (skill.startsWith('capsuna_meetings_')) void refreshMeetings();
       else if (skill.startsWith('capsuna_reminders_')) void refreshReminders();
+      else if (skill.startsWith('capsuna_notes_') || skill.startsWith('capsuna_journals_')) void refreshJournals();
     },
-    [refreshTasks, refreshMeetings, refreshReminders],
+    [refreshTasks, refreshMeetings, refreshReminders, refreshJournals],
   );
 
   const updateTurn = (id: string, patch: Partial<ChatTurn>): void => {
@@ -91,6 +94,7 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
         tasks: tasksRef.current,
         meetings: meetingsRef.current,
         reminders: remindersRef.current,
+        journals: journalsRef.current,
       });
 
       const turnId = crypto.randomUUID();
@@ -225,8 +229,9 @@ function buildContextSnapshot(params: {
   tasks: Task[];
   meetings: Meeting[];
   reminders: Reminder[];
+  journals: Journal[];
 }): string {
-  const { tasks, meetings, reminders } = params;
+  const { tasks, meetings, reminders, journals } = params;
 
   const now = new Date();
   const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
@@ -275,6 +280,20 @@ function buildContextSnapshot(params: {
     );
   }
 
+  if (journals.length > 0) {
+    const recent = [...journals]
+      .sort((a, b) => {
+        const ta = new Date(a.updatedAt ?? a.createdAt ?? a.date ?? 0).getTime();
+        const tb = new Date(b.updatedAt ?? b.createdAt ?? b.date ?? 0).getTime();
+        return tb - ta;
+      })
+      .slice(0, 20);
+    sections.push(
+      `Recent notes (${recent.length}):\n` +
+        recent.map(formatJournalLine).join('\n'),
+    );
+  }
+
   if (sections.length === 0) return '';
   return sections.join('\n\n');
 }
@@ -306,6 +325,15 @@ function formatReminderLine(r: Reminder): string {
   return parts.join(' · ');
 }
 
+function formatJournalLine(j: Journal): string {
+  const parts: string[] = [`- [${j.id}] "${oneLine(j.title)}"`];
+  if (j.date) parts.push(`date=${toIso(j.date)}`);
+  if (j.updatedAt) parts.push(`updatedAt=${toIso(j.updatedAt)}`);
+  if (j.tags?.length) parts.push(`tags=${j.tags.join(',')}`);
+  parts.push(`content="${truncate(oneLine(stripHtml(j.content)), 160)}"`);
+  return parts.join(' · ');
+}
+
 function oneLine(s: string): string {
   return (s ?? '').replace(/\s+/g, ' ').trim();
 }
@@ -320,4 +348,8 @@ function toIso(d: Date | string): string {
   } catch {
     return String(d);
   }
+}
+
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, ' ');
 }

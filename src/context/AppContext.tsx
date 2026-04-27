@@ -70,6 +70,7 @@ interface AppContextType {
   refreshTasks: () => Promise<void>;
   refreshMeetings: () => Promise<void>;
   refreshReminders: () => Promise<void>;
+  refreshJournals: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -224,6 +225,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setReminders(fresh);
     } catch (err) {
       console.warn('refreshReminders failed', err);
+    }
+  }, []);
+
+  const refreshJournals = useCallback(async (): Promise<void> => {
+    try {
+      const fresh = await JournalsAPI.getAll();
+      setJournals(fresh);
+    } catch (err) {
+      console.warn('refreshJournals failed', err);
     }
   }, []);
 
@@ -987,6 +997,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshTasks,
         refreshMeetings,
         refreshReminders,
+        refreshJournals,
       }}
     >
       {children}
