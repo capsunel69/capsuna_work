@@ -22,12 +22,13 @@ export function fileToOrchestrateImage(file: File): Promise<OrchestrateUserImage
   if (file.size > ORCHESTRATE_IMAGE_MAX_BYTES) {
     return Promise.reject(new Error('Image must be 4MB or smaller'));
   }
+  const mimeType = file.type;
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => {
       const s = r.result as string;
       const m = /^data:[^;]+;base64,(.+)$/.exec(s);
-      resolve({ mimeType: file.type, data: m ? m[1]! : s.replace(/\s/g, '') });
+      resolve({ mimeType, data: m ? m[1]! : s.replace(/\s/g, '') });
     };
     r.onerror = () => reject(r.error ?? new Error('read failed'));
     r.readAsDataURL(file);
