@@ -64,6 +64,12 @@ interface AppContextType {
   // Journal PIN verification
   isJournalPinVerified: boolean;
   setJournalPinVerified: (verified: boolean) => void;
+
+  // Background refresh — used after the agent mutates data via piovra
+  // skills so the UI reflects the change without a manual reload.
+  refreshTasks: () => Promise<void>;
+  refreshMeetings: () => Promise<void>;
+  refreshReminders: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -189,6 +195,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Per-resource pull. Called after the agent runs a `capsuna.*` mutation skill
+  // so the relevant page (Tasks / Meetings / Reminders) catches up live without
+  // a manual refresh. Errors are swallowed (cached state is fine to keep).
+  const refreshTasks = useCallback(async (): Promise<void> => {
+    try {
+      const fresh = await TasksAPI.getAll();
+      setTasks(fresh);
+    } catch (err) {
+      console.warn('refreshTasks failed', err);
+    }
+  }, []);
+
+  const refreshMeetings = useCallback(async (): Promise<void> => {
+    try {
+      const fresh = await MeetingsAPI.getAll();
+      setMeetings(fresh);
+    } catch (err) {
+      console.warn('refreshMeetings failed', err);
+    }
+  }, []);
+
+  const refreshReminders = useCallback(async (): Promise<void> => {
+    try {
+      const fresh = await RemindersAPI.getAll();
+      setReminders(fresh);
+    } catch (err) {
+      console.warn('refreshReminders failed', err);
+    }
   }, []);
 
   // Reconcile reminder conversion state against actual tasks. Returns the
@@ -947,6 +983,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         isJournalPinVerified,
         setJournalPinVerified,
+
+        refreshTasks,
+        refreshMeetings,
+        refreshReminders,
       }}
     >
       {children}

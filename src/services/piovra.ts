@@ -111,6 +111,11 @@ export interface JobCreate {
 
 export type JobPatch = Partial<Omit<JobCreate, 'instanceId'>>;
 
+export interface ChatHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface OrchestrateOptions {
   input: string;
   instanceId?: string;
@@ -124,6 +129,9 @@ export interface OrchestrateOptions {
     tokensOut: number | null;
   }) => void;
   onError?: (message: string) => void;
+  /** Prior turns in this chat thread (oldest first). Lets the agent resolve
+   * referents like "that task" without server-side thread persistence. */
+  history?: ChatHistoryMessage[];
   /** How long to keep polling after the SSE stream drops before giving up.
    * Defaults to 10 minutes — enough for Netlify Pro (10m) and most long runs. */
   pollTimeoutMs?: number;
@@ -232,6 +240,7 @@ export const PiovraAPI = {
           instanceId: opts.instanceId,
           clientTime: new Date().toISOString(),
           timezone,
+          history: opts.history,
         }),
         signal: opts.signal,
       });
