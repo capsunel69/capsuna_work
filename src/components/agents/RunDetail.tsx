@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Badge, Spinner, Stack } from '../ui/primitives';
 import { IconClock } from '../ui/icons';
 import { PiovraAPI, type AgentRun, type RunStatus, type ScheduledJob } from '../../services/piovra';
@@ -49,6 +51,64 @@ const Pre = styled.pre`
   white-space: pre-wrap;
   word-wrap: break-word;
   margin: 0;
+`;
+
+const MarkdownOutput = styled.div`
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  padding: var(--s-3) var(--s-4);
+  font-size: 13px;
+  color: var(--text-1);
+  line-height: 1.6;
+
+  p {
+    margin: 0 0 10px;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+  h1, h2, h3, h4 {
+    margin: 12px 0 8px;
+    color: var(--text-1);
+    line-height: 1.3;
+  }
+  h1 { font-size: 16px; }
+  h2 { font-size: 15px; }
+  h3, h4 { font-size: 14px; }
+  ul, ol {
+    margin: 0 0 10px 18px;
+    padding: 0;
+  }
+  li {
+    margin-bottom: 5px;
+  }
+  code {
+    background: var(--bg-1);
+    border: 1px solid var(--border-1);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-1);
+  }
+  pre {
+    margin: 8px 0 10px;
+    background: var(--bg-1);
+    border: 1px solid var(--border-1);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
 `;
 
 const StepStack = styled.div`
@@ -206,7 +266,9 @@ const RunDetail: React.FC<RunDetailProps> = ({ runId, onClose }) => {
           {run.output ? (
             <Section>
               <h4>Output</h4>
-              <Pre>{run.output}</Pre>
+              <MarkdownOutput>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.output}</ReactMarkdown>
+              </MarkdownOutput>
             </Section>
           ) : null}
 

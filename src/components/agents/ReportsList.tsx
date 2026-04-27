@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Badge, Card, CardHeader, CardTitle, CardSubtle, EmptyState,
   Field, Label, Row, Select, Spinner,
@@ -88,12 +90,46 @@ const OutputPreview = styled.div`
   color: var(--text-2);
   font-size: 13px;
   line-height: 1.55;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
+  max-height: 170px;
   overflow: hidden;
+
+  p {
+    margin: 0 0 8px;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+  h1, h2, h3, h4 {
+    margin: 8px 0 6px;
+    color: var(--text-1);
+    line-height: 1.3;
+  }
+  h1 { font-size: 15px; }
+  h2 { font-size: 14px; }
+  h3, h4 { font-size: 13px; }
+  ul, ol {
+    margin: 0 0 8px 18px;
+    padding: 0;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+  code {
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-1);
+  }
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
 `;
 
 const ErrorLine = styled.div`
@@ -135,27 +171,45 @@ const ReportsList: React.FC = () => {
   const [jobFilter, setJobFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<RunStatus | 'all'>('all');
 
-  useEffect(() => {
-    let cancelled = false;
-    setErr(null);
+  const load = useCallback(async (silently = false): Promise<void> => {
+    if (!silently) setErr(null);
 
-    Promise.all([
-      PiovraAPI.listRuns(),
-      PiovraAPI.listJobs(),
-      PiovraAPI.listInstances(),
-    ])
-      .then(([r, j, i]) => {
-        if (cancelled) return;
-        setRuns(r);
-        setJobs(j);
-        setInstances(i);
-      })
-      .catch((e) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
-      });
-
-    return () => { cancelled = true; };
+    try {
+      const [r, j, i] = await Promise.all([
+        PiovraAPI.listRuns(),
+        PiovraAPI.listJobs(),
+        PiovraAPI.listInstances(),
+      ]);
+      setRuns(r);
+      setJobs(j);
+      setInstances(i);
+      if (!silently) setErr(null);
+    } catch (e) {
+      if (!silently) setErr(e instanceof Error ? e.message : String(e));
+    }
   }, []);
+
+  useEffect(() => {
+    setErr(null);
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void load(true);
+    }, 8_000);
+    const onFocus = () => {
+      if (document.visibilityState === 'hidden') return;
+      void load(true);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [load]);
 
   const jobById = useMemo(() => {
     const m = new Map<string, ScheduledJob>();
@@ -257,7 +311,11 @@ const ReportsList: React.FC = () => {
                     {r.error ? (
                       <ErrorLine>{r.error}</ErrorLine>
                     ) : preview ? (
-                      <OutputPreview>{preview}</OutputPreview>
+                      <OutputPreview>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {preview}
+                        </ReactMarkdown>
+                      </OutputPreview>
                     ) : null}
                   </ReportCard>
                 );
