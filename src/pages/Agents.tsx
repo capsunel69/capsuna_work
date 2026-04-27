@@ -37,6 +37,12 @@ const HeaderRow = styled.div`
   align-items: flex-start;
   gap: var(--s-4);
   flex-wrap: wrap;
+
+  @media (max-width: 720px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-3);
+  }
 `;
 
 const HeaderCard = styled.div`
@@ -50,6 +56,12 @@ const HeaderCard = styled.div`
   gap: var(--s-4);
   overflow: hidden;
   position: relative;
+
+  @media (max-width: 720px) {
+    padding: var(--s-4) var(--s-4) 0;
+    border-radius: var(--r-md);
+    gap: var(--s-3);
+  }
 `;
 
 const ChatCTA = styled.button`
@@ -75,6 +87,11 @@ const ChatCTA = styled.button`
     transform: translateY(-1px);
     box-shadow: 0 6px 18px var(--accent-glow);
   }
+
+  @media (max-width: 720px) {
+    width: 100%;
+    justify-content: center;
+  }
 `;
 
 const TabBar = styled.div`
@@ -86,6 +103,11 @@ const TabBar = styled.div`
   overflow-x: auto;
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
+
+  @media (max-width: 720px) {
+    margin: 0 calc(-1 * var(--s-4));
+    padding: 0 var(--s-4);
+  }
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
@@ -126,6 +148,12 @@ const TabButton = styled.button<{ $active: boolean }>`
     transform: scaleX(${(p) => (p.$active ? 1 : 0.4)});
     transition: opacity 0.2s, transform 0.2s;
   }
+
+  @media (max-width: 720px) {
+    padding: 11px 12px;
+    font-size: 12px;
+    gap: 6px;
+  }
 `;
 
 const TabHint = styled.div`
@@ -133,6 +161,11 @@ const TabHint = styled.div`
   color: var(--text-3);
   padding: 6px 2px 12px;
   min-height: 24px;
+
+  @media (max-width: 720px) {
+    font-size: 11px;
+    padding-bottom: 10px;
+  }
 `;
 
 const Agents: React.FC = () => {

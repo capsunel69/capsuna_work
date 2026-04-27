@@ -34,6 +34,11 @@ const Toolbar = styled.div`
   padding: var(--s-3) var(--s-5);
   border-bottom: 1px solid var(--border-1);
   background: var(--bg-1);
+
+  @media (max-width: 760px) {
+    padding: var(--s-3) var(--s-4);
+    gap: var(--s-2);
+  }
 `;
 
 const Feed = styled.div`
@@ -55,6 +60,11 @@ const ReportCard = styled.button`
 
   &:hover { background: var(--bg-3); }
   &:last-child { border-bottom: 0; }
+
+  @media (max-width: 760px) {
+    padding: var(--s-3) var(--s-4);
+    gap: 6px;
+  }
 `;
 
 const HeaderLine = styled.div`
@@ -62,12 +72,20 @@ const HeaderLine = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+
+  @media (max-width: 760px) {
+    gap: 8px;
+  }
 `;
 
 const JobName = styled.span`
   font-size: 14px;
   font-weight: 600;
   color: var(--text-1);
+
+  @media (max-width: 760px) {
+    font-size: 13px;
+  }
 `;
 
 const SubtleLine = styled.div`
@@ -80,6 +98,11 @@ const SubtleLine = styled.div`
   font-family: var(--font-mono);
 
   svg { width: 12px; height: 12px; }
+
+  @media (max-width: 760px) {
+    font-size: 11px;
+    gap: 6px;
+  }
 `;
 
 /**
@@ -92,6 +115,11 @@ const OutputPreview = styled.div`
   line-height: 1.55;
   max-height: 170px;
   overflow: hidden;
+
+  @media (max-width: 760px) {
+    font-size: 12px;
+    max-height: 150px;
+  }
 
   p {
     margin: 0 0 8px;
@@ -256,7 +284,7 @@ const ReportsList: React.FC = () => {
       ) : (
         <>
           <Toolbar>
-            <Field style={{ minWidth: 200 }}>
+            <Field style={{ minWidth: 200, flex: '1 1 220px' }}>
               <Label>Schedule</Label>
               <Select value={jobFilter} onChange={(e) => setJobFilter(e.target.value)}>
                 <option value="all">All schedules</option>
@@ -265,7 +293,7 @@ const ReportsList: React.FC = () => {
                 ))}
               </Select>
             </Field>
-            <Field style={{ minWidth: 160 }}>
+            <Field style={{ minWidth: 160, flex: '1 1 160px' }}>
               <Label>Status</Label>
               <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as RunStatus | 'all')}>
                 <option value="all">All statuses</option>

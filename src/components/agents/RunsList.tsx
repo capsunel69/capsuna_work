@@ -47,6 +47,7 @@ const RowItem = styled.button`
       "status input  when"
       "run    tokens tokens";
     row-gap: 6px;
+    padding: 12px var(--s-4);
 
     .cell-status { grid-area: status; }
     .cell-input  { grid-area: input; }
@@ -68,6 +69,14 @@ const Input = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 760px) {
+    font-size: 12px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 `;
 
 const Tokens = styled.span`
@@ -80,6 +89,10 @@ const Time = styled.span`
   font-size: 11.5px;
   color: var(--text-3);
   font-family: var(--font-mono);
+
+  @media (max-width: 760px) {
+    font-size: 11px;
+  }
 `;
 
 const statusTone = (s: RunStatus): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' => {

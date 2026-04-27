@@ -50,6 +50,7 @@ const RowItem = styled.div`
       "cron       cron"
       "next       last";
     row-gap: 8px;
+    padding: 12px var(--s-4);
 
     .cell-name { grid-area: name; }
     .cell-instance { grid-area: instance; display: flex; flex-direction: row; align-items: center; gap: 8px; }
@@ -76,18 +77,31 @@ const Clickable = styled.button`
   span { font-size: 11.5px; color: var(--text-3); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   &:hover strong { color: var(--accent); }
+
+  @media (max-width: 900px) {
+    strong { font-size: 12.5px; }
+    span { font-size: 11px; }
+  }
 `;
 
 const Cron = styled.span`
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-2);
+
+  @media (max-width: 900px) {
+    font-size: 11px;
+  }
 `;
 
 const Meta = styled.span`
   font-size: 11.5px;
   color: var(--text-3);
   font-family: var(--font-mono);
+
+  @media (max-width: 900px) {
+    font-size: 11px;
+  }
 `;
 
 type Mode =

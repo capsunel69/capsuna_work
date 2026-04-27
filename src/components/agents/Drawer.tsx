@@ -31,6 +31,12 @@ const Panel = styled.aside`
   flex-direction: column;
   z-index: 151;
   animation: ${slideIn} 0.22s ease-out;
+
+  @media (max-width: 760px) {
+    width: 100vw;
+    border-left: 0;
+    box-shadow: none;
+  }
 `;
 
 const Header = styled.header`
@@ -40,6 +46,10 @@ const Header = styled.header`
   padding: var(--s-4) var(--s-5);
   border-bottom: 1px solid var(--border-1);
   flex-shrink: 0;
+
+  @media (max-width: 760px) {
+    padding: var(--s-3) var(--s-4);
+  }
 `;
 
 const Title = styled.h3`
@@ -55,6 +65,10 @@ const Body = styled.div`
   flex: 1;
   overflow: auto;
   padding: var(--s-5);
+
+  @media (max-width: 760px) {
+    padding: var(--s-4);
+  }
 `;
 
 interface DrawerProps {
