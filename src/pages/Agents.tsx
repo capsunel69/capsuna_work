@@ -4,14 +4,15 @@ import { useSearchParams } from 'react-router-dom';
 import {
   PageContainer, PageHeader, PageTitle, PageSubtitle,
 } from '../components/ui/primitives';
-import { IconBot, IconTerminal, IconClock, IconSettings, IconSend } from '../components/ui/icons';
+import { IconBot, IconTerminal, IconClock, IconSettings, IconSend, IconNote } from '../components/ui/icons';
 import DefinitionsList from '../components/agents/DefinitionsList';
 import InstancesList from '../components/agents/InstancesList';
 import RunsList from '../components/agents/RunsList';
 import JobsList from '../components/agents/JobsList';
+import ReportsList from '../components/agents/ReportsList';
 import { useChat } from '../context/ChatContext';
 
-type Tab = 'agents' | 'instances' | 'schedules' | 'runs';
+type Tab = 'agents' | 'instances' | 'schedules' | 'reports' | 'runs';
 
 const TABS: {
   id: Tab;
@@ -22,6 +23,7 @@ const TABS: {
   { id: 'agents',    label: 'Agents',    icon: IconBot,      hint: 'Definitions — prompts + skills'     },
   { id: 'instances', label: 'Instances', icon: IconSettings, hint: 'Deployed copies of a definition'    },
   { id: 'schedules', label: 'Schedules', icon: IconClock,    hint: 'Cron-driven recurring jobs'         },
+  { id: 'reports',   label: 'Reports',   icon: IconNote,     hint: 'Outputs from scheduled agent runs'  },
   { id: 'runs',      label: 'Runs',      icon: IconTerminal, hint: 'Full execution history with steps'  },
 ];
 
@@ -158,6 +160,7 @@ const Agents: React.FC = () => {
       case 'agents':    return <DefinitionsList />;
       case 'instances': return <InstancesList />;
       case 'schedules': return <JobsList />;
+      case 'reports':   return <ReportsList />;
       case 'runs':      return <RunsList />;
     }
   }, [tab]);

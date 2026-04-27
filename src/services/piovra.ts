@@ -6,8 +6,8 @@
  * `PIOVRA_API_KEY` never lives in the browser bundle.
  *
  * This file intentionally has no UI dependencies — it mirrors the
- * structure of `src/services/api.ts`. The Agents Hub UI (Chat / Agents
- * / Instances / Runs tabs) is deferred to a later phase.
+ * structure of `src/services/api.ts`. The Agents Hub UI (Definitions,
+ * Instances, Schedules, Runs, Reports) is built on top of these calls.
  */
 
 const BASE_URL = import.meta.env.VITE_PIOVRA_PROXY_URL ?? '/api/piovra';
@@ -47,6 +47,8 @@ export interface AgentInstance {
 export interface AgentRun {
   id: string;
   instanceId: string;
+  /** Set when the run was triggered by a scheduled job (or "run now" on a job). */
+  jobId: string | null;
   input: string;
   status: RunStatus;
   steps: AgentStep[];
@@ -94,6 +96,9 @@ export interface ScheduledJob {
   instanceId: string;
   name: string;
   cron: string;
+  /** IANA timezone the cron expression is interpreted in. `null` falls back
+   * to the server's local time. */
+  tz: string | null;
   enabled: boolean;
   payload: { input: string; metadata?: Record<string, unknown> };
   lastRunAt: string | null;
@@ -105,6 +110,7 @@ export interface JobCreate {
   instanceId: string;
   name: string;
   cron: string;
+  tz?: string | null;
   enabled?: boolean;
   payload: { input: string; metadata?: Record<string, unknown> };
 }

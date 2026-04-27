@@ -214,7 +214,10 @@ const JobsList: React.FC = () => {
                     <Badge>paused</Badge>
                   )}
                 </div>
-                <Cron className="cell-cron">{j.cron}</Cron>
+                <Cron className="cell-cron">
+                  {j.cron}
+                  {j.tz ? <Meta style={{ marginLeft: 6 }}>· {j.tz}</Meta> : null}
+                </Cron>
                 <Meta className="cell-next">{formatDate(j.nextRunAt)}</Meta>
                 <Meta className="cell-last">{formatDate(j.lastRunAt)}</Meta>
                 <div className="cell-action" style={{ textAlign: 'right' }}>

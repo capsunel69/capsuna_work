@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Badge, Spinner, Stack } from '../ui/primitives';
-import { PiovraAPI, type AgentRun, type RunStatus } from '../../services/piovra';
+import { IconClock } from '../ui/icons';
+import { PiovraAPI, type AgentRun, type RunStatus, type ScheduledJob } from '../../services/piovra';
 import StepCard from './StepCard';
 import Drawer from './Drawer';
 
@@ -78,20 +79,47 @@ interface RunDetailProps {
   onClose: () => void;
 }
 
+const JobChip = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  width: fit-content;
+
+  svg { width: 12px; height: 12px; }
+`;
+
 const RunDetail: React.FC<RunDetailProps> = ({ runId, onClose }) => {
   const [run, setRun] = useState<AgentRun | null>(null);
+  const [job, setJob] = useState<ScheduledJob | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!runId) { setRun(null); return; }
+    if (!runId) { setRun(null); setJob(null); return; }
     let cancelled = false;
     setRun(null);
+    setJob(null);
     setErr(null);
     PiovraAPI.getRun(runId)
       .then((r) => { if (!cancelled) setRun(r); })
       .catch((e) => { if (!cancelled) setErr(e instanceof Error ? e.message : String(e)); });
     return () => { cancelled = true; };
   }, [runId]);
+
+  useEffect(() => {
+    if (!run?.jobId) { setJob(null); return; }
+    let cancelled = false;
+    PiovraAPI.getJob(run.jobId)
+      .then((j) => { if (!cancelled) setJob(j); })
+      .catch(() => { if (!cancelled) setJob(null); });
+    return () => { cancelled = true; };
+  }, [run?.jobId]);
 
   return (
     <Drawer
@@ -112,6 +140,13 @@ const RunDetail: React.FC<RunDetailProps> = ({ runId, onClose }) => {
         </div>
       ) : (
         <Stack $gap={4}>
+          {run.jobId ? (
+            <JobChip title="This run was triggered by a scheduled job">
+              <IconClock />
+              {job ? `Scheduled · ${job.name}` : 'Scheduled run'}
+            </JobChip>
+          ) : null}
+
           <Meta>
             <div>
               <label>Started</label>

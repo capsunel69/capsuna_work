@@ -20,6 +20,26 @@ const PRESETS: { label: string; cron: string }[] = [
   { label: 'Mondays 09:00',     cron: '0 9 * * 1' },
 ];
 
+/** Small curated set + the user's local zone. Free-form input is also
+ *  allowed via the underlying <Input>. */
+const TZ_OPTIONS: string[] = [
+  'UTC',
+  'Europe/Bucharest',
+  'Europe/London',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Asia/Tokyo',
+];
+
+const browserTz = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+};
+
 const Footer = styled.div`
   display: flex;
   justify-content: space-between;
@@ -78,8 +98,12 @@ const JobForm: React.FC<JobFormProps> = ({
   );
   const [name, setName] = useState(existing?.name ?? '');
   const [cron, setCron] = useState(existing?.cron ?? '0 9 * * *');
+  const [tz, setTz] = useState<string>(existing?.tz ?? browserTz());
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
   const [input, setInput] = useState(existing?.payload.input ?? '');
+  const [metaJson, setMetaJson] = useState<string>(
+    existing?.payload.metadata ? JSON.stringify(existing.payload.metadata, null, 2) : '',
+  );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -90,14 +114,36 @@ const JobForm: React.FC<JobFormProps> = ({
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setErr(null);
+
+    let metadata: Record<string, unknown> | undefined;
+    if (metaJson.trim()) {
+      try {
+        const parsed = JSON.parse(metaJson);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          metadata = parsed as Record<string, unknown>;
+        } else {
+          setErr('Metadata must be a JSON object.');
+          return;
+        }
+      } catch {
+        setErr('Metadata is not valid JSON.');
+        return;
+      }
+    }
+
+    const payload: { input: string; metadata?: Record<string, unknown> } = { input };
+    if (metadata) payload.metadata = metadata;
+    const tzValue = tz.trim() || null;
+
     setSaving(true);
     try {
       if (existing) {
         const saved = await PiovraAPI.updateJob(existing.id, {
           name: name.trim(),
           cron: cron.trim(),
+          tz: tzValue,
           enabled,
-          payload: { input },
+          payload,
         });
         onSaved(saved);
       } else {
@@ -105,8 +151,9 @@ const JobForm: React.FC<JobFormProps> = ({
           instanceId,
           name: name.trim(),
           cron: cron.trim(),
+          tz: tzValue,
           enabled,
-          payload: { input },
+          payload,
         };
         const saved = await PiovraAPI.createJob(body);
         onSaved(saved);
@@ -162,23 +209,38 @@ const JobForm: React.FC<JobFormProps> = ({
           </Field>
         </FieldGroup>
 
-        <Field>
-          <Label>Cron expression</Label>
-          <Input
-            value={cron}
-            onChange={(e) => setCron(e.target.value)}
-            required
-            placeholder="0 9 * * *"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          />
-          <PresetRow>
-            {PRESETS.map((p) => (
-              <PresetChip key={p.cron} type="button" onClick={() => setCron(p.cron)}>
-                {p.label}
-              </PresetChip>
-            ))}
-          </PresetRow>
-        </Field>
+        <FieldGroup $cols={2}>
+          <Field>
+            <Label>Cron expression</Label>
+            <Input
+              value={cron}
+              onChange={(e) => setCron(e.target.value)}
+              required
+              placeholder="0 9 * * *"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <PresetRow>
+              {PRESETS.map((p) => (
+                <PresetChip key={p.cron} type="button" onClick={() => setCron(p.cron)}>
+                  {p.label}
+                </PresetChip>
+              ))}
+            </PresetRow>
+          </Field>
+
+          <Field>
+            <Label>Timezone</Label>
+            <Select value={tz} onChange={(e) => setTz(e.target.value)}>
+              {[browserTz(), ...TZ_OPTIONS]
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === browserTz() ? `${opt} (you)` : opt}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        </FieldGroup>
 
         <Field>
           <Label>Input prompt</Label>
@@ -188,6 +250,17 @@ const JobForm: React.FC<JobFormProps> = ({
             rows={5}
             required
             placeholder="Give me today's agenda and any overdue tasks."
+          />
+        </Field>
+
+        <Field>
+          <Label>Metadata (optional, JSON object)</Label>
+          <Textarea
+            value={metaJson}
+            onChange={(e) => setMetaJson(e.target.value)}
+            rows={3}
+            placeholder={'{ "kind": "ai-news", "channel": "morning-digest" }'}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
           />
         </Field>
 
