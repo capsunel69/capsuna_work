@@ -122,6 +122,12 @@ export interface ChatHistoryMessage {
   content: string;
 }
 
+/** User image for vision (raw base64, no data-URL prefix). Matches Piovra `/orchestrate`. */
+export type OrchestrateUserImage = {
+  mimeType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+  data: string;
+};
+
 export interface OrchestrateOptions {
   input: string;
   instanceId?: string;
@@ -142,6 +148,8 @@ export interface OrchestrateOptions {
    * reminders). Appended to the system prompt for this turn so the agent
    * can act without first calling list skills. */
   context?: string;
+  /** Images for this turn only (vision). Omitted from `history` on later calls. */
+  images?: OrchestrateUserImage[];
   /** How long to keep polling after the SSE stream drops before giving up.
    * Defaults to 10 minutes — enough for Netlify Pro (10m) and most long runs. */
   pollTimeoutMs?: number;
@@ -252,6 +260,7 @@ export const PiovraAPI = {
           timezone,
           history: opts.history,
           context: opts.context,
+          images: opts.images,
         }),
         signal: opts.signal,
       });

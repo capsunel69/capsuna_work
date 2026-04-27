@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Card, CardHeader, CardTitle, CardSubtle, EmptyState, Spinner } from '../ui/primitives';
-import { IconBot, IconSend, IconStop, IconRefresh } from '../ui/icons';
+import { IconBot, IconSend, IconStop, IconRefresh, IconImage, IconX } from '../ui/icons';
 import { useOrchestrate } from '../../hooks/useOrchestrate';
+import type { OrchestrateUserImage } from '../../services/piovra';
+import { ORCHESTRATE_IMAGE_MAX_COUNT, filesToOrchestrateImages } from '../../utils/orchestrateImages';
 import StepCard from './StepCard';
 
 const Shell = styled(Card)`
@@ -86,34 +88,163 @@ const TextInput = styled.textarea`
   &::placeholder { color: var(--text-4); }
 `;
 
+const ComposerMain = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+`;
+
+const AttachmentStrip = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+`;
+
+const ThumbWrap = styled.div`
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-2);
+  background: var(--bg-3);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const ThumbRemove = styled.button`
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+
+  svg {
+    width: 9px;
+    height: 9px;
+  }
+`;
+
+const AttachButton = styled.button`
+  width: 40px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    color: var(--text-1);
+    background: var(--bg-3);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
 interface ChatPanelProps {
   instanceId?: string;
   instanceName?: string | null;
 }
 
+type PendingImage = { id: string; preview: string; file: File };
+
 const ChatPanel: React.FC<ChatPanelProps> = ({ instanceId, instanceName }) => {
   const { turns, status, send, abort, reset } = useOrchestrate(instanceId);
   const [value, setValue] = useState('');
+  const [pending, setPending] = useState<PendingImage[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns, status]);
 
-  const handleSubmit = (e: React.FormEvent): void => {
+  const streaming = status === 'streaming';
+
+  const addFiles = (files: FileList | File[]): void => {
+    const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (list.length === 0) return;
+    setPending((prev) => {
+      const next = [...prev];
+      for (const f of list) {
+        if (next.length >= ORCHESTRATE_IMAGE_MAX_COUNT) break;
+        next.push({ id: crypto.randomUUID(), file: f, preview: URL.createObjectURL(f) });
+      }
+      return next;
+    });
+  };
+
+  const removePending = (id: string): void => {
+    setPending((prev) => {
+      const t = prev.find((p) => p.id === id);
+      if (t) URL.revokeObjectURL(t.preview);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!value.trim() || status === 'streaming') return;
+    if (streaming) return;
+    if (!value.trim() && pending.length === 0) return;
     const text = value;
+    const toSend = pending;
+
+    let images: OrchestrateUserImage[] | undefined;
+    try {
+      if (toSend.length > 0) {
+        images = await filesToOrchestrateImages(toSend.map((t) => t.file));
+      }
+    } catch {
+      return;
+    }
     setValue('');
-    void send(text);
+    setPending([]);
+    for (const p of toSend) URL.revokeObjectURL(p.preview);
+    void send(text, images);
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      void handleSubmit(e);
     }
+  };
+
+  const onPasteImages = (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
+    const files = e.clipboardData.files;
+    if (!files?.length) return;
+    const imgs = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (imgs.length === 0) return;
+    e.preventDefault();
+    addFiles(imgs);
   };
 
   return (
@@ -147,49 +278,98 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ instanceId, instanceName }) => {
             <div>Ask the agent anything — schedule something, create a task, or look up info.</div>
           </EmptyState>
         ) : (
-          turns.map((turn) => (
-            <Turn key={turn.id}>
-              <UserLine>{turn.input}</UserLine>
-              <AgentColumn>
-                {turn.steps.map((step, i) => (
-                  <StepCard key={i} step={step} />
-                ))}
-                {turn.status === 'streaming' && (
-                  <TurnFooter>
-                    <Spinner $size={12} /> thinking…
-                  </TurnFooter>
-                )}
-                {turn.error && (
-                  <TurnFooter style={{ color: 'var(--danger)' }}>{turn.error}</TurnFooter>
-                )}
-                {turn.status === 'idle' && turn.runId && (
-                  <TurnFooter>
-                    <span>run {turn.runId.slice(0, 8)}</span>
-                    {turn.tokensIn !== null && <span>in {turn.tokensIn}</span>}
-                    {turn.tokensOut !== null && <span>out {turn.tokensOut}</span>}
-                  </TurnFooter>
-                )}
-              </AgentColumn>
-            </Turn>
-          ))
+          turns.map((turn) => {
+            const u = turn.input.trim();
+            const userLabel =
+              u ||
+              (turn.imageCount
+                ? turn.imageCount === 1
+                  ? 'Image'
+                  : `${turn.imageCount} images`
+                : '');
+            return (
+              <Turn key={turn.id}>
+                <UserLine>
+                  {userLabel}
+                  {u && turn.imageCount ? ` · ${turn.imageCount} image(s)` : ''}
+                </UserLine>
+                <AgentColumn>
+                  {turn.steps.map((step, i) => (
+                    <StepCard key={i} step={step} />
+                  ))}
+                  {turn.status === 'streaming' && (
+                    <TurnFooter>
+                      <Spinner $size={12} /> thinking…
+                    </TurnFooter>
+                  )}
+                  {turn.error && (
+                    <TurnFooter style={{ color: 'var(--danger)' }}>{turn.error}</TurnFooter>
+                  )}
+                  {turn.status === 'idle' && turn.runId && (
+                    <TurnFooter>
+                      <span>run {turn.runId.slice(0, 8)}</span>
+                      {turn.tokensIn !== null && <span>in {turn.tokensIn}</span>}
+                      {turn.tokensOut !== null && <span>out {turn.tokensOut}</span>}
+                    </TurnFooter>
+                  )}
+                </AgentColumn>
+              </Turn>
+            );
+          })
         )}
       </Scroller>
 
       <Composer onSubmit={handleSubmit}>
-        <TextInput
-          placeholder="Ask the agent… (Shift+Enter for newline)"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKey}
-          rows={1}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+          aria-hidden
+          onChange={(e) => {
+            if (e.target.files?.length) addFiles(e.target.files);
+            e.target.value = '';
+          }}
         />
+        <AttachButton
+          type="button"
+          disabled={streaming}
+          onClick={() => fileRef.current?.click()}
+          title="Add image"
+          aria-label="Add image"
+        >
+          <IconImage />
+        </AttachButton>
+        <ComposerMain>
+          {pending.length > 0 && (
+            <AttachmentStrip>
+              {pending.map((p) => (
+                <ThumbWrap key={p.id}>
+                  <img src={p.preview} alt="" />
+                  <ThumbRemove type="button" onClick={() => removePending(p.id)} aria-label="Remove image">
+                    <IconX />
+                  </ThumbRemove>
+                </ThumbWrap>
+              ))}
+            </AttachmentStrip>
+          )}
+          <TextInput
+            placeholder="Ask the agent… (Shift+Enter newline, paste images)"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKey}
+            onPaste={onPasteImages}
+            rows={1}
+          />
+        </ComposerMain>
         {status === 'streaming' ? (
           <Button type="button" $variant="danger" onClick={abort}>
             <IconStop />
             Stop
           </Button>
         ) : (
-          <Button type="submit" $variant="primary" disabled={!value.trim()}>
+          <Button type="submit" $variant="primary" disabled={!value.trim() && pending.length === 0}>
             <IconSend />
             Send
           </Button>

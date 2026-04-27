@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { PiovraAPI, type AgentStep, type ChatHistoryMessage } from '../services/piovra';
+import { PiovraAPI, type AgentStep, type ChatHistoryMessage, type OrchestrateUserImage } from '../services/piovra';
 import { useAppContext } from '../context/AppContext';
 import type { Meeting, Reminder, Task } from '../types';
 
@@ -8,6 +8,8 @@ export type ChatStatus = 'idle' | 'streaming' | 'error';
 export interface ChatTurn {
   id: string;
   input: string;
+  /** Number of images sent with this turn (for history hint; bytes are not kept). */
+  imageCount?: number;
   steps: AgentStep[];
   output: string | null;
   error: string | null;
@@ -21,7 +23,7 @@ export interface ChatTurn {
 interface UseOrchestrateResult {
   turns: ChatTurn[];
   status: ChatStatus;
-  send: (input: string) => Promise<void>;
+  send: (input: string, images?: OrchestrateUserImage[]) => Promise<void>;
   abort: () => void;
   reset: () => void;
 }
@@ -79,9 +81,10 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
   turnsRef.current = turns;
 
   const send = useCallback(
-    async (input: string): Promise<void> => {
+    async (input: string, images?: OrchestrateUserImage[]): Promise<void> => {
       const trimmed = input.trim();
-      if (!trimmed) return;
+      const imageList = images?.length ? images : undefined;
+      if (!trimmed && !imageList?.length) return;
 
       const history = buildHistory(turnsRef.current);
       const context = buildContextSnapshot({
@@ -94,6 +97,7 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
       const newTurn: ChatTurn = {
         id: turnId,
         input: trimmed,
+        imageCount: imageList?.length,
         steps: [],
         output: null,
         error: null,
@@ -115,6 +119,7 @@ export function useOrchestrate(instanceId?: string): UseOrchestrateResult {
           instanceId,
           history,
           context,
+          images: imageList,
           signal: controller.signal,
           onStep: (step) => {
             appendStep(turnId, step);
@@ -180,7 +185,11 @@ function buildHistory(turns: ChatTurn[]): ChatHistoryMessage[] {
   const out: ChatHistoryMessage[] = [];
   for (const t of turns) {
     if (t.status !== 'idle') continue;
-    if (t.input?.trim()) out.push({ role: 'user', content: t.input });
+    const u = t.input?.trim() ?? '';
+    if (u || t.imageCount) {
+      const line = (u || '(image)') + (t.imageCount ? ` [${t.imageCount} image(s)]` : '');
+      out.push({ role: 'user', content: line });
+    }
     const assistantText =
       (t.output && t.output.trim()) ||
       lastAssistantText(t.steps) ||

@@ -1,10 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { IconButton, Spinner } from '../ui/primitives';
-import { IconBot, IconSend, IconStop, IconRefresh, IconX } from '../ui/icons';
+import { IconBot, IconSend, IconStop, IconRefresh, IconX, IconImage } from '../ui/icons';
 import StepCard from '../agents/StepCard';
 import { useChat } from '../../context/ChatContext';
 import { useOverlayCount } from '../../hooks/useOverlayStack';
+import type { OrchestrateUserImage } from '../../services/piovra';
+import {
+  ORCHESTRATE_IMAGE_MAX_COUNT,
+  filesToOrchestrateImages,
+} from '../../utils/orchestrateImages';
 
 /* ── Launcher bubble ───────────────────────────────────────────────────── */
 
@@ -360,6 +365,89 @@ const ComposerBar = styled.form`
   flex-shrink: 0;
 `;
 
+const ComposerMain = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+`;
+
+const AttachmentStrip = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px 8px 2px;
+`;
+
+const ThumbWrap = styled.div`
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-2);
+  flex-shrink: 0;
+  background: var(--bg-3);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const ThumbRemove = styled.button`
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+
+  svg {
+    width: 10px;
+    height: 10px;
+  }
+`;
+
+const AttachButton = styled.button`
+  width: 38px;
+  height: 38px;
+  margin: 3px 0 3px 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--bg-3);
+    border-color: var(--border-1);
+    color: var(--text-1);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
 const TextInputWrap = styled.div<{ $focused: boolean; $disabled: boolean }>`
   flex: 1;
   display: flex;
@@ -438,20 +526,32 @@ const SUGGESTIONS = [
   'Remind me to stretch at 5pm',
 ];
 
+type PendingImage = { id: string; preview: string; file: File };
+
 const ChatWidget: React.FC = () => {
   const { turns, status, send, abort, reset, isOpen, open, close, instanceId, setInstanceId } = useChat();
   const overlayCount = useOverlayCount();
   const bubbleHidden = isOpen || overlayCount > 0;
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
+  const [pending, setPending] = useState<PendingImage[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
 
   useEffect(() => {
     if (!isOpen) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns, status, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    for (const p of pendingRef.current) URL.revokeObjectURL(p.preview);
+    setPending([]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -476,28 +576,71 @@ const ChatWidget: React.FC = () => {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
-  const handleSubmit = (e: React.FormEvent): void => {
+  const addFiles = (files: FileList | File[]): void => {
+    const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (list.length === 0) return;
+    setPending((prev) => {
+      const next = [...prev];
+      for (const f of list) {
+        if (next.length >= ORCHESTRATE_IMAGE_MAX_COUNT) break;
+        next.push({ id: crypto.randomUUID(), file: f, preview: URL.createObjectURL(f) });
+      }
+      return next;
+    });
+  };
+
+  const removePending = (id: string): void => {
+    setPending((prev) => {
+      const t = prev.find((p) => p.id === id);
+      if (t) URL.revokeObjectURL(t.preview);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const streaming = status === 'streaming';
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!value.trim() || status === 'streaming') return;
+    if (streaming) return;
+    if (!value.trim() && pending.length === 0) return;
     const text = value;
+    const toSend = pending;
+
+    let images: OrchestrateUserImage[] | undefined;
+    try {
+      if (toSend.length > 0) {
+        images = await filesToOrchestrateImages(toSend.map((t) => t.file));
+      }
+    } catch {
+      return;
+    }
     setValue('');
+    setPending([]);
+    for (const p of toSend) URL.revokeObjectURL(p.preview);
     autoGrow(textareaRef.current);
-    void send(text);
+    void send(text, images);
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      void handleSubmit(e);
     }
+  };
+
+  const onPasteImages = (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
+    const files = e.clipboardData.files;
+    if (!files?.length) return;
+    const imgs = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (imgs.length === 0) return;
+    e.preventDefault();
+    addFiles(imgs);
   };
 
   const submitSuggestion = (text: string): void => {
     if (status === 'streaming') return;
     void send(text);
   };
-
-  const streaming = status === 'streaming';
 
   return (
     <>
@@ -576,9 +719,21 @@ const ChatWidget: React.FC = () => {
                 </Suggestions>
               </EmptyWrap>
             ) : (
-              turns.map((turn) => (
+              turns.map((turn) => {
+                const u = turn.input.trim();
+                const userLabel =
+                  u ||
+                  (turn.imageCount
+                    ? turn.imageCount === 1
+                      ? 'Image'
+                      : `${turn.imageCount} images`
+                    : '');
+                return (
                 <Turn key={turn.id}>
-                  <UserLine>{turn.input}</UserLine>
+                  <UserLine>
+                    {userLabel}
+                    {u && turn.imageCount ? ` · ${turn.imageCount} image(s)` : ''}
+                  </UserLine>
                   <AgentColumn>
                     {turn.steps.map((step, i) => (
                       <StepCard key={i} step={step} />
@@ -600,16 +755,54 @@ const ChatWidget: React.FC = () => {
                     )}
                   </AgentColumn>
                 </Turn>
-              ))
+                );
+              })
             )}
           </Scroller>
 
           <ComposerBar onSubmit={handleSubmit}>
-            <div style={{ flex: 1 }}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              multiple
+              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+              aria-hidden
+              onChange={(e) => {
+                if (e.target.files?.length) addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <AttachButton
+              type="button"
+              disabled={streaming}
+              onClick={() => fileRef.current?.click()}
+              title="Add image"
+              aria-label="Add image"
+            >
+              <IconImage />
+            </AttachButton>
+            <ComposerMain>
+              {pending.length > 0 && (
+                <AttachmentStrip>
+                  {pending.map((p) => (
+                    <ThumbWrap key={p.id}>
+                      <img src={p.preview} alt="" />
+                      <ThumbRemove
+                        type="button"
+                        onClick={() => removePending(p.id)}
+                        aria-label="Remove image"
+                      >
+                        <IconX />
+                      </ThumbRemove>
+                    </ThumbWrap>
+                  ))}
+                </AttachmentStrip>
+              )}
               <TextInputWrap $focused={focused} $disabled={streaming}>
                 <TextInput
                   ref={textareaRef}
-                  placeholder="Message Piovra…"
+                  placeholder="Message Piovra… (paste or attach images)"
                   value={value}
                   onChange={(e) => {
                     setValue(e.target.value);
@@ -618,6 +811,7 @@ const ChatWidget: React.FC = () => {
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
                   onKeyDown={handleKey}
+                  onPaste={onPasteImages}
                   rows={1}
                   disabled={streaming}
                 />
@@ -629,15 +823,17 @@ const ChatWidget: React.FC = () => {
                   <SendButton
                     type="submit"
                     $variant="send"
-                    disabled={!value.trim()}
+                    disabled={!value.trim() && pending.length === 0}
                     aria-label="Send"
                   >
                     <IconSend />
                   </SendButton>
                 )}
               </TextInputWrap>
-              <Hint>Enter to send · Shift+Enter for newline · Esc to close</Hint>
-            </div>
+              <Hint>
+                Enter to send · Shift+Enter newline · paste or attach images · Esc to close
+              </Hint>
+            </ComposerMain>
           </ComposerBar>
         </Panel>
       )}
