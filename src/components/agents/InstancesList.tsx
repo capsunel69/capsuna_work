@@ -1,9 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { Badge, Button, Card, CardHeader, CardTitle, CardSubtle, EmptyState, Spinner } from '../ui/primitives';
-import { IconBot, IconSend } from '../ui/icons';
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  CardSubtle,
+  CardTitle,
+  EmptyState,
+  Field,
+  Input,
+  Label,
+  Row as UiRow,
+  Select,
+  Spinner,
+  Stack,
+} from '../ui/primitives';
+import { IconBot, IconPlus, IconSend } from '../ui/icons';
 import { PiovraAPI, type AgentDefinition, type AgentInstance, type AgentStatus } from '../../services/piovra';
 import { useChat } from '../../context/ChatContext';
+import Drawer from './Drawer';
 
 const Table = styled.div`
   display: flex;
@@ -71,6 +87,14 @@ const ActionCell = styled.div`
   @media (max-width: 760px) { grid-area: action; }
 `;
 
+const FormError = styled.div`
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+`;
+
 const statusTone = (s: AgentStatus): 'neutral' | 'success' | 'warning' | 'danger' => {
   switch (s) {
     case 'running': return 'success';
@@ -85,21 +109,70 @@ const InstancesList: React.FC = () => {
   const [instances, setInstances] = useState<AgentInstance[] | null>(null);
   const [defs, setDefs] = useState<AgentDefinition[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [definitionId, setDefinitionId] = useState('');
+  const [name, setName] = useState('');
+
+  const load = useCallback(async (): Promise<void> => {
+    setErr(null);
+    try {
+      const [i, d] = await Promise.all([PiovraAPI.listInstances(), PiovraAPI.listDefinitions()]);
+      setInstances(i);
+      setDefs(d);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    let cancelled = false;
-    setErr(null);
-    Promise.all([PiovraAPI.listInstances(), PiovraAPI.listDefinitions()])
-      .then(([i, d]) => { if (!cancelled) { setInstances(i); setDefs(d); } })
-      .catch((e) => { if (!cancelled) setErr(e instanceof Error ? e.message : String(e)); });
-    return () => { cancelled = true; };
-  }, []);
+    if (!createOpen) return;
+    if (!definitionId && defs && defs.length > 0) {
+      setDefinitionId(defs[0].id);
+    }
+  }, [createOpen, defs, definitionId]);
 
   const defById = useMemo(() => {
     const map = new Map<string, AgentDefinition>();
     (defs ?? []).forEach((d) => map.set(d.id, d));
     return map;
   }, [defs]);
+
+  const openCreate = (): void => {
+    setCreateErr(null);
+    setName('');
+    setDefinitionId((defs && defs[0]?.id) ?? '');
+    setCreateOpen(true);
+  };
+
+  const closeCreate = (): void => {
+    if (saving) return;
+    setCreateOpen(false);
+  };
+
+  const handleCreate = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setCreateErr(null);
+    const trimmed = name.trim();
+    if (!definitionId || !trimmed) return;
+    setSaving(true);
+    try {
+      await PiovraAPI.createInstance({
+        definitionId,
+        name: trimmed,
+      });
+      setCreateOpen(false);
+      setName('');
+      await load();
+    } catch (createError) {
+      setCreateErr(createError instanceof Error ? createError.message : String(createError));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Card>
@@ -108,9 +181,15 @@ const InstancesList: React.FC = () => {
           <IconBot />
           Agent instances
         </CardTitle>
-        <CardSubtle>
-          {instances ? `${instances.length} deployed` : err ? 'unavailable' : 'loading…'}
-        </CardSubtle>
+        <UiRow $gap={3}>
+          <CardSubtle>
+            {instances ? `${instances.length} deployed` : err ? 'unavailable' : 'loading…'}
+          </CardSubtle>
+          <Button $variant="primary" $size="sm" onClick={openCreate} disabled={!defs || defs.length === 0}>
+            <IconPlus />
+            New
+          </Button>
+        </UiRow>
       </CardHeader>
 
       {err ? (
@@ -159,6 +238,45 @@ const InstancesList: React.FC = () => {
           })}
         </Table>
       )}
+
+      <Drawer open={createOpen} onClose={closeCreate} title="New instance">
+        <form onSubmit={handleCreate}>
+          <Stack $gap={4}>
+            {createErr ? <FormError>{createErr}</FormError> : null}
+            <Field>
+              <Label>Definition</Label>
+              <Select
+                value={definitionId}
+                onChange={(event) => setDefinitionId(event.target.value)}
+                required
+              >
+                {(defs ?? []).map((def) => (
+                  <option key={def.id} value={def.id}>
+                    {def.name} ({def.model})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field>
+              <Label>Instance name</Label>
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="tech-radar daily"
+                required
+              />
+            </Field>
+            <UiRow $gap={2} style={{ justifyContent: 'flex-end' }}>
+              <Button type="button" $variant="ghost" onClick={closeCreate} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" $variant="primary" disabled={saving || !definitionId || !name.trim()}>
+                {saving ? 'Creating…' : 'Create instance'}
+              </Button>
+            </UiRow>
+          </Stack>
+        </form>
+      </Drawer>
     </Card>
   );
 };
