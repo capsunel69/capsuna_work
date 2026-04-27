@@ -114,7 +114,7 @@ const Panel = styled.aside`
   position: fixed;
   right: 22px;
   bottom: 22px;
-  width: min(420px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
   height: min(640px, calc(100vh - 120px));
   background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
   border: 1px solid var(--border-2);
@@ -475,7 +475,10 @@ const TextInput = styled.textarea`
   line-height: 1.5;
   outline: none;
 
-  &::placeholder { color: var(--text-4); }
+  &::placeholder {
+    color: var(--text-4);
+    white-space: nowrap;
+  }
 `;
 
 const SendButton = styled.button<{ $variant: 'send' | 'stop' }>`
@@ -803,7 +806,7 @@ const ChatWidget: React.FC = () => {
               <TextInputWrap $focused={focused} $disabled={streaming}>
                 <TextInput
                   ref={textareaRef}
-                  placeholder="Message Piovra… (tasks, meetings, reminders, email)"
+                  placeholder="Message Piovra… (email, tasks, meetings)"
                   value={value}
                   onChange={(e) => {
                     setValue(e.target.value);
