@@ -1,17 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { format, formatDistanceToNow } from 'date-fns';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useAppContext } from '../context/AppContext';
 import type { Journal } from '../types';
 import {
   PageContainer, PageHeader, PageTitle, PageSubtitle,
-  Button, Input, Textarea, EmptyState, Badge, IconButton, Spinner,
+  Button, Input, EmptyState, Badge, IconButton, Spinner,
 } from '../components/ui/primitives';
 import {
-  IconNote, IconPlus, IconTrash, IconSearch, IconChevronLeft, IconEdit, IconCheck,
+  IconNote, IconPlus, IconTrash, IconSearch, IconChevronLeft,
 } from '../components/ui/icons';
+import NotesRichEditor from '../components/notes/NotesRichEditor';
 
 const Shell = styled.div`
   display: grid;
@@ -182,81 +181,6 @@ const TagsField = styled(Input)`
   font-family: var(--font-mono);
 `;
 
-const BodyTextarea = styled(Textarea)`
-  flex: 1;
-  min-height: 200px;
-  font-size: 14px;
-  line-height: 1.65;
-  resize: none;
-`;
-
-const PreviewBox = styled.div`
-  flex: 1;
-  min-height: 200px;
-  overflow: auto;
-  background: var(--bg-0);
-  border: 1px solid var(--border-1);
-  border-radius: var(--r-sm);
-  padding: var(--s-4);
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text-1);
-
-  p { margin: 0 0 10px; }
-  p:last-child { margin-bottom: 0; }
-  h1, h2, h3, h4 { margin: 14px 0 8px; line-height: 1.3; }
-  h1 { font-size: 1.25rem; }
-  h2 { font-size: 1.1rem; }
-  ul, ol { margin: 0 0 10px 20px; }
-  a { color: var(--accent); }
-  pre {
-    background: var(--bg-2);
-    border: 1px solid var(--border-1);
-    border-radius: 8px;
-    padding: 10px 12px;
-    overflow: auto;
-    font-size: 12.5px;
-  }
-  code {
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    background: var(--bg-2);
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-  blockquote {
-    margin: 0 0 10px;
-    padding-left: 12px;
-    border-left: 3px solid var(--accent);
-    color: var(--text-2);
-  }
-`;
-
-const Segmented = styled.div`
-  display: inline-flex;
-  border: 1px solid var(--border-1);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-  margin-left: auto;
-`;
-
-const SegBtn = styled.button<{ $on?: boolean }>`
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 0;
-  background: ${(p) => (p.$on ? 'var(--bg-3)' : 'transparent')};
-  color: ${(p) => (p.$on ? 'var(--text-1)' : 'var(--text-3)')};
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover {
-    color: var(--text-1);
-  }
-`;
-
 const SaveHint = styled.span`
   font-size: 11.5px;
   color: var(--text-3);
@@ -270,8 +194,18 @@ function journalSortTime(j: Journal): number {
   return Math.max(u, d, c);
 }
 
-function snippet(text: string, max = 100): string {
-  const t = text.replace(/\s+/g, ' ').trim();
+function stripHtml(html: string): string {
+  if (!html) return '';
+  if (typeof document === 'undefined') {
+    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || d.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function snippetFromHtml(html: string, max = 100): string {
+  const t = stripHtml(html);
   if (t.length <= max) return t || 'Empty note';
   return `${t.slice(0, max)}…`;
 }
@@ -286,7 +220,6 @@ const Notes: React.FC = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tagsInput, setTagsInput] = useState('');
-  const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
@@ -310,7 +243,7 @@ const Notes: React.FC = () => {
     if (!q) return sorted;
     return sorted.filter((j) => {
       if (j.title.toLowerCase().includes(q)) return true;
-      if (j.content.toLowerCase().includes(q)) return true;
+      if (stripHtml(j.content).toLowerCase().includes(q)) return true;
       if (j.tags?.some((t) => t.toLowerCase().includes(q))) return true;
       return false;
     });
@@ -321,7 +254,6 @@ const Notes: React.FC = () => {
     [journals, selectedId],
   );
 
-  // Keep selection in sync if note deleted
   useEffect(() => {
     if (selectedId && !journals.some((j) => j.id === selectedId)) {
       setSelectedId(null);
@@ -329,7 +261,6 @@ const Notes: React.FC = () => {
     }
   }, [journals, selectedId, isNarrow]);
 
-  // Load editor when selection changes
   useEffect(() => {
     if (!selected) {
       setTitle('');
@@ -388,7 +319,7 @@ const Notes: React.FC = () => {
     setSaveState('idle');
     await addJournal({
       title: 'Untitled',
-      content: '',
+      content: '<p></p>',
       date: new Date(),
       tags: [],
     });
@@ -402,7 +333,6 @@ const Notes: React.FC = () => {
     }
   }, [journals.length, selectedId, sorted]);
 
-  // After addJournal, select newest (last in list is actually first in sorted)
   const prevLen = useRef(journals.length);
   useEffect(() => {
     if (journals.length > prevLen.current) {
@@ -417,7 +347,6 @@ const Notes: React.FC = () => {
 
   const openNote = (id: string) => {
     setSelectedId(id);
-    setMode('write');
     if (isNarrow) setMobilePanel('editor');
   };
 
@@ -442,7 +371,7 @@ const Notes: React.FC = () => {
             Notes
           </PageTitle>
           <PageSubtitle>
-            Journals with search, tags, and markdown preview. Edits save automatically.
+            Rich text journals — bold, underline, links, lists. Edits save automatically.
           </PageSubtitle>
         </div>
       </PageHeader>
@@ -490,7 +419,7 @@ const Notes: React.FC = () => {
                     onClick={() => openNote(j.id)}
                   >
                     <NoteTitle>{j.title || 'Untitled'}</NoteTitle>
-                    <NoteSnippet>{snippet(j.content || '')}</NoteSnippet>
+                    <NoteSnippet>{snippetFromHtml(j.content || '')}</NoteSnippet>
                     <Meta>
                       <span title={format(when, 'PPpp')}>
                         {formatDistanceToNow(when, { addSuffix: true })}
@@ -518,6 +447,7 @@ const Notes: React.FC = () => {
               Create a note to start writing.
             </EmptyState>
           ) : (
+            selected && selectedId && (
             <>
               <EditorHeader>
                 {isNarrow && (
@@ -533,30 +463,12 @@ const Notes: React.FC = () => {
                 {saveState === 'saving' && <SaveHint>Saving…</SaveHint>}
                 {saveState === 'saved' && <SaveHint>Saved</SaveHint>}
                 {saveState === 'error' && <SaveHint style={{ color: 'var(--danger)' }}>Save failed</SaveHint>}
-                <Segmented>
-                  <SegBtn
-                    type="button"
-                    $on={mode === 'write'}
-                    onClick={() => setMode('write')}
-                  >
-                    <IconEdit />
-                    Write
-                  </SegBtn>
-                  <SegBtn
-                    type="button"
-                    $on={mode === 'preview'}
-                    onClick={() => setMode('preview')}
-                  >
-                    <IconCheck />
-                    Preview
-                  </SegBtn>
-                </Segmented>
+                <div style={{ flex: 1 }} />
                 <IconButton
                   $variant="ghost"
                   $size="sm"
                   title="Delete note"
                   onClick={handleDelete}
-                  style={{ marginLeft: isNarrow ? 0 : 8 }}
                 >
                   <IconTrash />
                 </IconButton>
@@ -572,21 +484,14 @@ const Notes: React.FC = () => {
                   onChange={(e) => setTagsInput(e.target.value)}
                   placeholder="Tags — comma separated (work, ideas, capsuna)"
                 />
-                {mode === 'write' ? (
-                  <BodyTextarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Write in Markdown. Use **bold**, lists, links, and code blocks."
-                  />
-                ) : (
-                  <PreviewBox>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {content || '_Nothing written yet._'}
-                    </ReactMarkdown>
-                  </PreviewBox>
-                )}
+                <NotesRichEditor
+                  key={selectedId}
+                  initialHtml={selected.content || ''}
+                  onChange={setContent}
+                />
               </EditorBody>
             </>
+            )
           )}
         </EditorColumn>
       </Shell>
