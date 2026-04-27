@@ -522,8 +522,9 @@ const Hint = styled.div`
 const SUGGESTIONS = [
   'Add a task for today',
   "What's on my agenda?",
+  'Email office@seroxy.eu from my work account about tomorrow',
   'Schedule a meeting tomorrow at 3pm',
-  'Remind me to stretch at 5pm',
+  'Send a follow-up email to my latest work contact',
 ];
 
 type PendingImage = { id: string; preview: string; file: File };
@@ -702,7 +703,7 @@ const ChatWidget: React.FC = () => {
                 </EmptyAvatar>
                 <EmptyTitle>How can I help?</EmptyTitle>
                 <EmptyHint>
-                  I can add tasks, schedule meetings, set reminders, and look things up. Try one
+                  I can add tasks, schedule meetings, set reminders, read/send email, and look things up. Try one
                   of these:
                 </EmptyHint>
                 <Suggestions>
@@ -802,7 +803,7 @@ const ChatWidget: React.FC = () => {
               <TextInputWrap $focused={focused} $disabled={streaming}>
                 <TextInput
                   ref={textareaRef}
-                  placeholder="Message Piovra… (paste or attach images)"
+                  placeholder="Message Piovra… (tasks, meetings, reminders, email)"
                   value={value}
                   onChange={(e) => {
                     setValue(e.target.value);

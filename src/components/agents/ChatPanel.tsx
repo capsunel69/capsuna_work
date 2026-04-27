@@ -275,7 +275,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ instanceId, instanceName }) => {
         {turns.length === 0 ? (
           <EmptyState>
             <IconBot />
-            <div>Ask the agent anything — schedule something, create a task, or look up info.</div>
+            <div>Ask the agent anything — schedule, create tasks, read/send email, or look up info.</div>
           </EmptyState>
         ) : (
           turns.map((turn) => {
@@ -355,7 +355,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ instanceId, instanceName }) => {
             </AttachmentStrip>
           )}
           <TextInput
-            placeholder="Ask the agent… (Shift+Enter newline, paste images)"
+            placeholder="Ask the agent… (tasks, meetings, reminders, email)"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKey}
