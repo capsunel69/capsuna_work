@@ -35,6 +35,12 @@ const ReminderRow = styled.div<{ $today?: boolean; $converted?: boolean }>`
     }
   `}
   ${p => p.$converted && `opacity: 0.65;`}
+
+  @media (max-width: 720px) {
+    padding: var(--s-3);
+    gap: var(--s-2);
+    flex-wrap: wrap;
+  }
 `;
 
 const Title = styled.h3`
@@ -71,7 +77,18 @@ const MetaRow = styled.div`
 
 const Body = styled.div` flex: 1; min-width: 0; `;
 
-const Actions = styled.div` display: flex; gap: 6px; flex-shrink: 0; `;
+const Actions = styled.div`
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+
+  @media (max-width: 720px) {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+`;
 
 const daysOfWeek = [
   { value: 0, label: 'Sunday' }, { value: 1, label: 'Monday' }, { value: 2, label: 'Tuesday' },

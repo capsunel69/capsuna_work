@@ -18,6 +18,12 @@ export const CardHeader = styled.div`
   gap: var(--s-3);
   padding: var(--s-4) var(--s-5);
   border-bottom: 1px solid var(--border-1);
+  flex-wrap: wrap;
+
+  @media (max-width: 720px) {
+    padding: var(--s-3);
+    gap: var(--s-2);
+  }
 `;
 
 export const CardTitle = styled.h3`
@@ -44,6 +50,10 @@ export const CardBody = styled.div`
 
 export const CardSection = styled.div`
   padding: var(--s-5);
+
+  @media (max-width: 720px) {
+    padding: var(--s-3);
+  }
 `;
 
 /* ── Page primitives ──────────────────────────────────────────────────── */
@@ -73,6 +83,11 @@ export const PageTitle = styled.h1`
   gap: var(--s-3);
 
   svg { color: var(--accent); }
+
+  @media (max-width: 720px) {
+    font-size: 18px;
+    gap: var(--s-2);
+  }
 `;
 
 export const PageSubtitle = styled.p`
@@ -197,6 +212,12 @@ const fieldBase = css`
   &:hover:not(:disabled) { border-color: var(--border-3); }
   &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--bg-2); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* iOS zooms in on focus when the input's font-size is below 16px.
+   * Bump it on small viewports so the input doesn't reflow the page. */
+  @media (max-width: 720px) {
+    font-size: 16px;
+  }
 `;
 
 export const Input = styled.input`${fieldBase}`;
@@ -401,6 +422,10 @@ export const ComposerBody = styled.textarea`
   line-height: 1.55;
 
   &::placeholder { color: var(--text-4); }
+
+  @media (max-width: 720px) {
+    font-size: 16px;
+  }
 `;
 
 export const ComposerToolbar = styled.div`
@@ -458,6 +483,12 @@ export const Chip = styled.button<{ $active?: boolean; $tone?: ChipTone }>`
   svg { width: 13px; height: 13px; }
 
   ${p => p.$active && chipActive(p.$tone ?? 'accent')}
+
+  @media (max-width: 720px) {
+    height: 34px;
+    font-size: 13px;
+    padding: 0 12px;
+  }
 `;
 
 export const ChipGroup = styled.div`
@@ -474,6 +505,14 @@ export const ChipGroup = styled.div`
     background: transparent;
     height: 24px;
     padding: 0 10px;
+  }
+
+  @media (max-width: 720px) {
+    ${Chip} {
+      height: 30px;
+      padding: 0 12px;
+      font-size: 13px;
+    }
   }
 `;
 
@@ -498,4 +537,12 @@ export const GhostInput = styled.input`
   &:focus { border-color: var(--accent); background: var(--bg-2); }
 
   &[type='number'] { width: 70px; }
+
+  @media (max-width: 720px) {
+    font-size: 16px;
+    height: 36px;
+    padding: 0 12px;
+
+    &[type='number'] { width: 80px; }
+  }
 `;

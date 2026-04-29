@@ -46,7 +46,7 @@ const BubbleWrap = styled.div<{ $hidden: boolean }>`
 
   @media (max-width: 720px) {
     right: 14px;
-    bottom: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -148,10 +148,10 @@ const Panel = styled.aside`
 
   @media (max-width: 720px) {
     right: 8px;
-    bottom: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     left: 8px;
     width: auto;
-    height: min(80vh, calc(100vh - 80px));
+    height: min(82vh, calc(100vh - 72px));
   }
 `;
 
@@ -373,27 +373,19 @@ const SuggestionChip = styled.button`
 
 const ComposerBar = styled.form`
   border-top: 1px solid var(--border-1);
-  padding: 10px 12px 12px;
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  background: rgba(7, 9, 13, 0.4);
-  flex-shrink: 0;
-`;
-
-const ComposerMain = styled.div`
-  flex: 1;
-  min-width: 0;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 6px;
+  background: rgba(7, 9, 13, 0.4);
+  flex-shrink: 0;
 `;
 
 const AttachmentStrip = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 0 2px 8px 2px;
+  padding: 0 4px 4px;
 `;
 
 const ThumbWrap = styled.div`
@@ -434,23 +426,23 @@ const ThumbRemove = styled.button`
   }
 `;
 
-const AttachButton = styled.button`
-  width: 38px;
-  height: 38px;
-  margin: 3px 0 3px 0;
+/** Inline icon button that lives inside the input pill (attach, mic). */
+const PillIconButton = styled.button<{ $recording?: boolean; $busy?: boolean }>`
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  border: 1px solid var(--border-2);
-  background: var(--bg-2);
-  color: var(--text-2);
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
   display: grid;
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  padding: 0;
 
   &:hover:not(:disabled) {
     background: var(--bg-3);
-    border-color: var(--border-1);
     color: var(--text-1);
   }
   &:disabled {
@@ -458,28 +450,49 @@ const AttachButton = styled.button`
     cursor: not-allowed;
   }
 
+  ${(p) =>
+    p.$recording &&
+    css`
+      background: var(--danger);
+      color: #0b0306;
+      animation: ${recPulse} 1.4s ease-out infinite;
+      &:hover:not(:disabled) {
+        background: var(--danger);
+        color: #0b0306;
+      }
+    `}
+
+  ${(p) =>
+    p.$busy &&
+    !p.$recording &&
+    css`
+      cursor: progress;
+    `}
+
   svg {
-    width: 16px;
-    height: 16px;
+    width: 17px;
+    height: 17px;
   }
 `;
 
 const TextInputWrap = styled.div<{ $focused: boolean; $disabled: boolean }>`
-  flex: 1;
   display: flex;
   align-items: flex-end;
+  gap: 2px;
   background: var(--bg-2);
   border: 1px solid ${(p) => (p.$focused ? 'var(--accent)' : 'var(--border-2)')};
-  border-radius: 14px;
-  padding: 4px 6px 4px 12px;
+  border-radius: 22px;
+  padding: 4px 4px 4px 6px;
   transition: border-color 0.15s, box-shadow 0.15s;
   box-shadow: ${(p) => (p.$focused ? '0 0 0 3px var(--accent-soft)' : 'none')};
   opacity: ${(p) => (p.$disabled ? 0.6 : 1)};
+  min-width: 0;
 `;
 
 const TextInput = styled.textarea`
   flex: 1;
-  min-height: 40px;
+  min-width: 0;
+  min-height: 36px;
   max-height: 160px;
   resize: none;
   background: transparent;
@@ -487,20 +500,40 @@ const TextInput = styled.textarea`
   color: var(--text-1);
   font: inherit;
   font-size: 14px;
-  padding: 10px 2px;
-  line-height: 1.5;
+  padding: 8px 8px;
+  line-height: 1.45;
   outline: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
+
+  /* Hide native scrollbars; the textarea still scrolls via wheel/touch. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+  /* Some webkit builds expose the resize corner even with resize:none. */
+  &::-webkit-resizer {
+    display: none;
+  }
 
   &::placeholder {
     color: var(--text-4);
-    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    font-size: 16px;
   }
 `;
 
 const SendButton = styled.button<{ $variant: 'send' | 'stop' }>`
-  width: 38px;
-  height: 38px;
-  margin: 3px;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  align-self: flex-end;
   border-radius: 999px;
   border: none;
   display: grid;
@@ -514,7 +547,7 @@ const SendButton = styled.button<{ $variant: 'send' | 'stop' }>`
       ? css`
           background: linear-gradient(135deg, var(--accent), var(--purple));
           color: #06121d;
-          box-shadow: 0 4px 16px rgba(76, 194, 255, 0.3);
+          box-shadow: 0 4px 16px rgba(76, 194, 255, 0.25);
         `
       : css`
           background: var(--danger);
@@ -540,53 +573,6 @@ const recPulse = keyframes`
   0%   { box-shadow: 0 0 0 0 rgba(255, 93, 108, 0.55); }
   70%  { box-shadow: 0 0 0 10px rgba(255, 93, 108, 0); }
   100% { box-shadow: 0 0 0 0 rgba(255, 93, 108, 0); }
-`;
-
-const MicButton = styled.button<{ $recording: boolean; $busy: boolean }>`
-  width: 38px;
-  height: 38px;
-  margin: 3px 0;
-  border-radius: 999px;
-  border: 1px solid var(--border-2);
-  background: var(--bg-2);
-  color: var(--text-2);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
-
-  ${(p) =>
-    p.$recording &&
-    css`
-      background: var(--danger);
-      border-color: var(--danger);
-      color: #0b0306;
-      animation: ${recPulse} 1.4s ease-out infinite;
-    `}
-
-  ${(p) =>
-    p.$busy &&
-    !p.$recording &&
-    css`
-      opacity: 0.8;
-      cursor: progress;
-    `}
-
-  &:hover:not(:disabled):not([data-recording='true']) {
-    background: var(--bg-3);
-    border-color: var(--border-1);
-    color: var(--text-1);
-  }
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
 `;
 
 const RecBar = styled.div`
@@ -697,6 +683,7 @@ const SUGGESTIONS = [
 type PendingImage = { id: string; preview: string; file: File };
 
 const VOICE_MODE_KEY = 'piovra.chat.voiceMode';
+const VOICE_ID_KEY = 'piovra.chat.voiceId';
 
 function formatElapsed(ms: number): string {
   const total = Math.floor(ms / 1000);
@@ -735,6 +722,10 @@ const ChatWidget: React.FC = () => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(VOICE_MODE_KEY) === '1';
   });
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(VOICE_ID_KEY);
+  });
   const [voiceNoticeDismissed, setVoiceNoticeDismissed] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -768,9 +759,28 @@ const ChatWidget: React.FC = () => {
     window.localStorage.setItem(VOICE_MODE_KEY, voiceMode ? '1' : '0');
   }, [voiceMode]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedVoiceId) window.localStorage.setItem(VOICE_ID_KEY, selectedVoiceId);
+  }, [selectedVoiceId]);
+
   const sttAvailable = !!voiceCaps?.stt.available && recorder.isSupported;
   const ttsAvailable = !!voiceCaps?.tts.available;
   const voiceFullyAvailable = sttAvailable && ttsAvailable;
+
+  const availableVoices = voiceCaps?.tts.voices ?? [];
+  const activeVoiceId =
+    (selectedVoiceId && availableVoices.some((v) => v.id === selectedVoiceId)
+      ? selectedVoiceId
+      : null) ?? voiceCaps?.tts.defaultVoice ?? null;
+  const activeVoice = availableVoices.find((v) => v.id === activeVoiceId) ?? null;
+
+  const cycleVoice = useCallback((): void => {
+    if (availableVoices.length === 0) return;
+    const idx = availableVoices.findIndex((v) => v.id === activeVoiceId);
+    const next = availableVoices[(idx + 1) % availableVoices.length];
+    setSelectedVoiceId(next.id);
+  }, [activeVoiceId, availableVoices]);
 
   const stopPlayback = useCallback((): void => {
     const el = audioRef.current;
@@ -798,8 +808,8 @@ const ChatWidget: React.FC = () => {
       try {
         const blob = await VoiceAPI.synthesize({
           text,
-          voice: (voiceCaps?.tts.defaultVoice as 'nova') ?? 'nova',
-          format: 'mp3',
+          voice: activeVoiceId ?? undefined,
+          format: 'mp3_44100_128',
         });
         const url = URL.createObjectURL(blob);
         audioUrlRef.current = url;
@@ -829,7 +839,7 @@ const ChatWidget: React.FC = () => {
         setVoiceError(err instanceof Error ? err.message : String(err));
       }
     },
-    [stopPlayback, ttsAvailable, voiceCaps],
+    [stopPlayback, ttsAvailable, activeVoiceId],
   );
 
   const togglePlayTurn = useCallback(
@@ -1077,8 +1087,19 @@ const ChatWidget: React.FC = () => {
                 }
               >
                 {voiceMode ? <IconVolume /> : <IconVolumeOff />}
-                {voiceMode ? 'Voice' : 'Voice'}
+                Voice
               </HeaderChip>
+              {ttsAvailable && availableVoices.length > 1 && activeVoice && (
+                <HeaderChip
+                  type="button"
+                  onClick={cycleVoice}
+                  title={`Switch voice (currently ${activeVoice.name})`}
+                  aria-label={`Switch voice — currently ${activeVoice.name}`}
+                >
+                  {activeVoice.gender === 'masculine' ? '♂' : activeVoice.gender === 'feminine' ? '♀' : '·'}
+                  {activeVoice.name}
+                </HeaderChip>
+              )}
               {turns.length > 0 && (
                 <HeaderChip type="button" onClick={reset} title="Reset conversation">
                   <IconRefresh />
@@ -1248,118 +1269,116 @@ const ChatWidget: React.FC = () => {
                 e.target.value = '';
               }}
             />
-            <AttachButton
-              type="button"
-              disabled={streaming}
-              onClick={() => fileRef.current?.click()}
-              title="Add image"
-              aria-label="Add image"
-            >
-              <IconImage />
-            </AttachButton>
-            <MicButton
-              type="button"
-              data-recording={recording ? 'true' : undefined}
-              $recording={recording}
-              $busy={micBusy}
-              disabled={micDisabled}
-              onClick={handleMicClick}
-              title={
-                !sttAvailable
-                  ? "Voice unavailable on this model — switch to one that supports voice"
-                  : recording
-                    ? `Stop & ${voiceMode ? 'send' : 'transcribe'} (${formatElapsed(recorder.elapsedMs)})`
-                    : voiceMode
-                      ? 'Hold-to-talk: speak, then tap to send'
-                      : 'Record voice (tap again to stop & transcribe)'
-              }
-              aria-label={recording ? 'Stop recording' : 'Start voice recording'}
-              aria-pressed={recording}
-            >
-              {transcribing ? (
-                <Spinner $size={14} />
-              ) : recording ? (
-                <IconStop />
-              ) : sttAvailable ? (
-                <IconMic />
-              ) : (
-                <IconMicOff />
-              )}
-            </MicButton>
-            <ComposerMain>
-              {pending.length > 0 && (
-                <AttachmentStrip>
-                  {pending.map((p) => (
-                    <ThumbWrap key={p.id}>
-                      <img src={p.preview} alt="" />
-                      <ThumbRemove
-                        type="button"
-                        onClick={() => removePending(p.id)}
-                        aria-label="Remove image"
-                      >
-                        <IconX />
-                      </ThumbRemove>
-                    </ThumbWrap>
-                  ))}
-                </AttachmentStrip>
-              )}
-              {recording && (
-                <RecBar>
-                  <span className="dot" />
-                  <span>recording · {formatElapsed(recorder.elapsedMs)}</span>
-                  <span style={{ marginLeft: 'auto' }}>
-                    tap mic to {voiceMode ? 'send' : 'transcribe'} · or
-                  </span>
-                  <PlayChip
-                    type="button"
-                    onClick={() => recorder.cancel()}
-                    title="Cancel recording"
-                  >
-                    <IconX /> cancel
-                  </PlayChip>
-                </RecBar>
-              )}
-              {transcribing && (
-                <RecBar>
-                  <Spinner $size={10} />
-                  <span>transcribing…</span>
-                </RecBar>
-              )}
-              <TextInputWrap $focused={focused} $disabled={streaming}>
-                <TextInput
-                  ref={textareaRef}
-                  placeholder="Message Piovra… (email, tasks, meetings)"
-                  value={value}
-                  onChange={(e) => {
-                    setValue(e.target.value);
-                    autoGrow(e.currentTarget);
-                  }}
-                  onFocus={() => setFocused(true)}
-                  onBlur={() => setFocused(false)}
-                  onKeyDown={handleKey}
-                  onPaste={onPasteImages}
-                  rows={1}
-                  disabled={streaming}
-                />
-                {streaming ? (
-                  <SendButton type="button" $variant="stop" onClick={abort} aria-label="Stop">
-                    <IconStop />
-                  </SendButton>
+            {pending.length > 0 && (
+              <AttachmentStrip>
+                {pending.map((p) => (
+                  <ThumbWrap key={p.id}>
+                    <img src={p.preview} alt="" />
+                    <ThumbRemove
+                      type="button"
+                      onClick={() => removePending(p.id)}
+                      aria-label="Remove image"
+                    >
+                      <IconX />
+                    </ThumbRemove>
+                  </ThumbWrap>
+                ))}
+              </AttachmentStrip>
+            )}
+            {recording && (
+              <RecBar>
+                <span className="dot" />
+                <span>recording · {formatElapsed(recorder.elapsedMs)}</span>
+                <span style={{ marginLeft: 'auto' }}>
+                  tap mic to {voiceMode ? 'send' : 'transcribe'} · or
+                </span>
+                <PlayChip
+                  type="button"
+                  onClick={() => recorder.cancel()}
+                  title="Cancel recording"
+                >
+                  <IconX /> cancel
+                </PlayChip>
+              </RecBar>
+            )}
+            {transcribing && (
+              <RecBar>
+                <Spinner $size={10} />
+                <span>transcribing…</span>
+              </RecBar>
+            )}
+            <TextInputWrap $focused={focused} $disabled={streaming}>
+              <PillIconButton
+                type="button"
+                disabled={streaming}
+                onClick={() => fileRef.current?.click()}
+                title="Add image"
+                aria-label="Add image"
+              >
+                <IconImage />
+              </PillIconButton>
+              <PillIconButton
+                type="button"
+                data-recording={recording ? 'true' : undefined}
+                $recording={recording}
+                $busy={micBusy}
+                disabled={micDisabled}
+                onClick={handleMicClick}
+                title={
+                  !sttAvailable
+                    ? "Voice unavailable on this model — switch to one that supports voice"
+                    : recording
+                      ? `Stop & ${voiceMode ? 'send' : 'transcribe'} (${formatElapsed(recorder.elapsedMs)})`
+                      : voiceMode
+                        ? 'Hold-to-talk: speak, then tap to send'
+                        : 'Record voice (tap again to stop & transcribe)'
+                }
+                aria-label={recording ? 'Stop recording' : 'Start voice recording'}
+                aria-pressed={recording}
+              >
+                {transcribing ? (
+                  <Spinner $size={14} />
+                ) : recording ? (
+                  <IconStop />
+                ) : sttAvailable ? (
+                  <IconMic />
                 ) : (
-                  <SendButton
-                    type="submit"
-                    $variant="send"
-                    disabled={!value.trim() && pending.length === 0}
-                    aria-label="Send"
-                  >
-                    <IconSend />
-                  </SendButton>
+                  <IconMicOff />
                 )}
-              </TextInputWrap>
-              <Hint>
-                Enter to send · Shift+Enter newline · attach images · tap mic to talk · Esc to close
-              </Hint>
-            </ComposerMain>
+              </PillIconButton>
+              <TextInput
+                ref={textareaRef}
+                placeholder="Message Piovra…"
+                value={value}
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  autoGrow(e.currentTarget);
+                }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                onKeyDown={handleKey}
+                onPaste={onPasteImages}
+                rows={1}
+                disabled={streaming}
+              />
+              {streaming ? (
+                <SendButton type="button" $variant="stop" onClick={abort} aria-label="Stop">
+                  <IconStop />
+                </SendButton>
+              ) : (
+                <SendButton
+                  type="submit"
+                  $variant="send"
+                  disabled={!value.trim() && pending.length === 0}
+                  aria-label="Send"
+                >
+                  <IconSend />
+                </SendButton>
+              )}
+            </TextInputWrap>
+            <Hint>
+              Enter to send · Shift+Enter newline · Esc to close
+            </Hint>
           </ComposerBar>
         </Panel>
       )}

@@ -5,9 +5,20 @@
  *   GET  /voice/capabilities    -> { stt: { available, ... }, tts: { ... } }
  *   POST /voice/stt             -> { text }   (raw audio body, content-type = mime)
  *   POST /voice/tts             -> audio/*   (JSON body { text, voice?, ... })
+ *
+ * STT is OpenAI's `gpt-4o-mini-transcribe`.
+ * TTS is ElevenLabs (defaults to the Anca / Leon voices configured server-side).
  */
 
 const BASE_URL = import.meta.env.VITE_PIOVRA_PROXY_URL ?? '/api/piovra';
+
+export type VoiceGender = 'feminine' | 'masculine' | 'neutral';
+
+export interface VoiceDescriptor {
+  id: string;
+  name: string;
+  gender: VoiceGender;
+}
 
 export interface VoiceCapabilities {
   stt: {
@@ -17,21 +28,36 @@ export interface VoiceCapabilities {
   };
   tts: {
     available: boolean;
-    provider: 'openai' | null;
+    provider: 'elevenlabs' | 'openai' | null;
     model: string;
-    voices: string[];
+    voices: VoiceDescriptor[];
+    /** ElevenLabs voice id (e.g. `GRHbHyXbUO8nF4YexVTa` for Anca). */
     defaultVoice: string;
   };
 }
 
-export type TtsVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
-
 export interface TtsOptions {
   text: string;
-  voice?: TtsVoice;
-  model?: 'tts-1' | 'tts-1-hd';
-  format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav';
-  speed?: number;
+  /** ElevenLabs voice id; falls back to the orchestrator default. */
+  voice?: string;
+  /** ElevenLabs model id, e.g. `eleven_turbo_v2_5` or `eleven_multilingual_v2`. */
+  model?: string;
+  /** Output format. `mp3_44100_128` plays everywhere; defaults to that server-side. */
+  format?:
+    | 'mp3_22050_32'
+    | 'mp3_44100_32'
+    | 'mp3_44100_64'
+    | 'mp3_44100_96'
+    | 'mp3_44100_128'
+    | 'mp3_44100_192'
+    | 'opus_48000_64'
+    | 'opus_48000_96'
+    | 'opus_48000_128'
+    | 'opus_48000_192';
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  speakerBoost?: boolean;
   signal?: AbortSignal;
 }
 

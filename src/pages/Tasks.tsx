@@ -35,6 +35,12 @@ const TaskRow = styled.div<{ $done?: boolean; $dragging?: boolean; $over?: boole
 
   &:first-child { border-top: none; }
   &:hover { background: var(--bg-3); }
+
+  @media (max-width: 720px) {
+    padding: var(--s-3);
+    gap: var(--s-2);
+    flex-wrap: wrap;
+  }
 `;
 
 const Drag = styled.div`
@@ -94,6 +100,13 @@ const Actions = styled.div`
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+
+  @media (max-width: 720px) {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
 `;
 
 const FilterBar = styled.div`
@@ -104,9 +117,20 @@ const FilterBar = styled.div`
   background: var(--bg-2);
   border: 1px solid var(--border-1);
   border-radius: var(--r-md);
+  flex-wrap: wrap;
 
   .label { font-size: 11px; text-transform: uppercase; color: var(--text-3); letter-spacing: 0.06em; font-weight: 600; display: flex; align-items: center; gap: 6px; }
   .label svg { width: 14px; height: 14px; }
+
+  @media (max-width: 720px) {
+    gap: var(--s-2);
+    padding: var(--s-3);
+    > * {
+      flex: 1 1 calc(50% - var(--s-2));
+      min-width: 0;
+    }
+    .label { flex: 0 0 auto; }
+  }
 `;
 
 const InlineSelect = styled(Select)`

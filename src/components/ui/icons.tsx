@@ -206,6 +206,14 @@ export const IconRefresh = make(
   </>
 );
 
+export const IconMenu = make(
+  <>
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </>
+);
+
 export const IconMic = make(
   <>
     <rect x="9" y="3" width="6" height="12" rx="3" />

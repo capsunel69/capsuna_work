@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
+import { useRegisterOverlay } from '../../hooks/useOverlayStack';
 import BackgroundFx from './BackgroundFx';
 import ChatWidget from '../chat/ChatWidget';
 import {
   IconDashboard, IconTasks, IconCalendar, IconBell, IconNote,
   IconLogout, IconChevronLeft, IconSpark, IconClock, IconBot,
+  IconMenu, IconX,
 } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 
@@ -28,29 +30,72 @@ const NAV_PRIMARY: NavItem[] = [
   { to: '/agents',    label: 'Agents',    icon: IconBot },
 ];
 
+/** Mobile drawer breakpoint — keep this in sync with CSS @media queries. */
+const MOBILE_BP = 720;
+
 /* ── Layout chrome ─────────────────────────────────────────────────────── */
 
 const Shell = styled.div<{ $collapsed: boolean }>`
   display: grid;
   grid-template-columns: ${p => p.$collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)'} 1fr;
   height: 100vh;
+  /* Use the dynamic viewport when supported so the URL bar collapsing on
+   * mobile Safari doesn't cause the layout to overflow. */
+  height: 100dvh;
   width: 100vw;
   background: var(--bg-0);
   position: relative;
   z-index: 1;
   transition: grid-template-columns 0.2s ease;
 
-  @media (max-width: 720px) {
-    grid-template-columns: var(--sidebar-w-collapsed) 1fr;
+  @media (max-width: ${MOBILE_BP}px) {
+    grid-template-columns: 1fr;
   }
 `;
 
-const Sidebar = styled.aside`
+const slideIn = keyframes`
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+`;
+
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`;
+
+const Sidebar = styled.aside<{ $mobileOpen: boolean }>`
   background: var(--bg-1);
   border-right: 1px solid var(--border-1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
+
+  @media (max-width: ${MOBILE_BP}px) {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(280px, 86vw);
+    z-index: 250;
+    transform: translateX(${p => p.$mobileOpen ? '0' : '-100%'});
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: ${p => p.$mobileOpen ? '0 24px 64px rgba(0,0,0,0.55)' : 'none'};
+    ${p => p.$mobileOpen && `animation: ${slideIn} 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);`}
+  }
+`;
+
+const Backdrop = styled.div<{ $open: boolean }>`
+  display: none;
+
+  @media (max-width: ${MOBILE_BP}px) {
+    display: ${p => p.$open ? 'block' : 'none'};
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 4, 8, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 240;
+    animation: ${fadeIn} 0.2s ease-out;
+  }
 `;
 
 const Brand = styled.div<{ $collapsed: boolean }>`
@@ -85,6 +130,16 @@ const Brand = styled.div<{ $collapsed: boolean }>`
 
   .name strong { font-size: 13px; font-weight: 600; color: var(--text-1); letter-spacing: 0.02em; }
   .name span { font-size: 10.5px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
+
+  .close-mobile {
+    display: none;
+    margin-left: auto;
+  }
+
+  @media (max-width: ${MOBILE_BP}px) {
+    .name { display: flex; }
+    .close-mobile { display: inline-flex; }
+  }
 `;
 
 const SidebarSectionLabel = styled.div<{ $collapsed: boolean }>`
@@ -95,6 +150,10 @@ const SidebarSectionLabel = styled.div<{ $collapsed: boolean }>`
   color: var(--text-3);
   letter-spacing: 0.08em;
   padding: var(--s-3) var(--s-5) var(--s-2);
+
+  @media (max-width: ${MOBILE_BP}px) {
+    display: block;
+  }
 `;
 
 const Nav = styled.nav`
@@ -140,6 +199,13 @@ const NavLinkStyled = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
 
   svg { width: 18px; height: 18px; flex-shrink: 0; }
   .label { display: ${p => p.$collapsed ? 'none' : 'inline'}; }
+
+  @media (max-width: ${MOBILE_BP}px) {
+    padding: 12px 14px;
+    font-size: 14px;
+    min-height: 44px;
+    .label { display: inline; }
+  }
 `;
 
 const SidebarFooter = styled.div`
@@ -167,6 +233,14 @@ const FooterButton = styled.button<{ $collapsed: boolean }>`
 
   svg { width: 18px; height: 18px; flex-shrink: 0; }
   .label { display: ${p => p.$collapsed ? 'none' : 'inline'}; }
+
+  @media (max-width: ${MOBILE_BP}px) {
+    padding: 12px 14px;
+    font-size: 14px;
+    min-height: 44px;
+    justify-content: flex-start;
+    .label { display: inline; }
+  }
 `;
 
 /* ── Topbar / content ──────────────────────────────────────────────────── */
@@ -176,6 +250,7 @@ const Main = styled.div`
   flex-direction: column;
   min-width: 0;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 `;
 
@@ -190,12 +265,34 @@ const Topbar = styled.header`
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   flex-shrink: 0;
+  gap: var(--s-3);
+
+  @media (max-width: ${MOBILE_BP}px) {
+    padding: 0 var(--s-3);
+    gap: var(--s-2);
+  }
 `;
 
 const TopbarLeft = styled.div`
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  min-width: 0;
+`;
+
+const SidebarToggle = styled(IconButton)`
+  /** Hide the desktop chevron on mobile — we render a hamburger instead. */
+  @media (max-width: ${MOBILE_BP}px) {
+    display: none;
+  }
+`;
+
+const HamburgerToggle = styled(IconButton)`
+  display: none;
+
+  @media (max-width: ${MOBILE_BP}px) {
+    display: inline-flex;
+  }
 `;
 
 const Crumbs = styled.div`
@@ -204,15 +301,33 @@ const Crumbs = styled.div`
   gap: var(--s-2);
   font-size: 12px;
   color: var(--text-3);
+  min-width: 0;
 
+  .prefix,
   .sep { color: var(--text-4); }
   .here { color: var(--text-1); font-weight: 500; }
+
+  @media (max-width: ${MOBILE_BP}px) {
+    font-size: 13px;
+    .prefix,
+    .sep { display: none; }
+    .here {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+  }
 `;
 
 const TopbarRight = styled.div`
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  flex-shrink: 0;
+
+  @media (max-width: ${MOBILE_BP}px) {
+    gap: var(--s-2);
+  }
 `;
 
 const StatusPill = styled.div`
@@ -234,6 +349,10 @@ const StatusPill = styled.div`
     background: var(--success);
     box-shadow: 0 0 8px var(--success);
   }
+
+  @media (max-width: ${MOBILE_BP}px) {
+    display: none;
+  }
 `;
 
 const Clock = styled.div`
@@ -243,8 +362,22 @@ const Clock = styled.div`
   font-size: 12px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 
-  svg { width: 14px; height: 14px; color: var(--text-3); }
+  svg { width: 14px; height: 14px; color: var(--text-3); flex-shrink: 0; }
+
+  .day { color: var(--text-2); }
+  .sep { color: var(--text-3); }
+  .time { color: var(--text-1); font-weight: 500; }
+
+  @media (max-width: ${MOBILE_BP}px) {
+    gap: 4px;
+    font-size: 12.5px;
+
+    svg { display: none; }
+    .day,
+    .sep { display: none; }
+  }
 `;
 
 const Content = styled.main`
@@ -252,6 +385,7 @@ const Content = styled.main`
   overflow: auto;
   position: relative;
   isolation: isolate;
+  -webkit-overflow-scrolling: touch;
 `;
 
 const ContentInner = styled.div`
@@ -261,8 +395,10 @@ const ContentInner = styled.div`
   margin: 0 auto;
   padding: var(--s-6) var(--s-6);
 
-  @media (max-width: 720px) {
-    padding: var(--s-4);
+  @media (max-width: ${MOBILE_BP}px) {
+    padding: var(--s-3);
+    /* Leave room for the floating chat bubble. */
+    padding-bottom: calc(var(--s-3) + 80px);
   }
 `;
 
@@ -281,6 +417,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('sidebarCollapsed') === '1';
   });
+  const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
+
+  // Register the mobile drawer in the global overlay stack so the chat
+  // bubble auto-hides while it's open.
+  useRegisterOverlay(mobileNavOpen);
+
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
   }, [collapsed]);
@@ -289,6 +431,42 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const t = setInterval(() => setCurrentDate(new Date()), 30_000);
     return () => clearInterval(t);
   }, [setCurrentDate]);
+
+  // Close drawer on route change so users don't see it linger after a tap.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll while the drawer is open (prevents background scroll
+  // on iOS / Android when the drawer is taller than the viewport).
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileNavOpen]);
+
+  // Close the drawer on Esc.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileNavOpen]);
+
+  // Auto-close the drawer if the viewport grows past the breakpoint.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !mobileNavOpen) return;
+    const onResize = (): void => {
+      if (window.innerWidth > MOBILE_BP) setMobileNavOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [mobileNavOpen]);
 
   const currentLabel = useMemo(() => {
     const match = NAV_PRIMARY.find(n => n.to === location.pathname);
@@ -299,19 +477,35 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     document.title = `${currentLabel} · Capsuna`;
   }, [currentLabel]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     if (window.confirm('Sign out of the control panel?')) logout();
-  };
+  }, [logout]);
 
   return (
     <Shell $collapsed={collapsed}>
-      <Sidebar>
+      <Backdrop
+        $open={mobileNavOpen}
+        onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
+      />
+      <Sidebar
+        $mobileOpen={mobileNavOpen}
+        aria-label="Primary navigation"
+      >
         <Brand $collapsed={collapsed}>
           <div className="logo"><IconSpark /></div>
           <div className="name">
             <strong>Capsuna</strong>
             <span>control panel</span>
           </div>
+          <IconButton
+            className="close-mobile"
+            $variant="ghost"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close menu"
+          >
+            <IconX />
+          </IconButton>
         </Brand>
 
         <SidebarSectionLabel $collapsed={collapsed}>Workspace</SidebarSectionLabel>
@@ -326,6 +520,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 $active={active}
                 $collapsed={collapsed}
                 title={collapsed ? item.label : undefined}
+                onClick={() => setMobileNavOpen(false)}
               >
                 <Icon />
                 <span className="label">{item.label}</span>
@@ -335,7 +530,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </Nav>
 
         <SidebarFooter>
-          <FooterButton $collapsed={collapsed} onClick={handleLogout} title={collapsed ? 'Sign out' : undefined}>
+          <FooterButton
+            $collapsed={collapsed}
+            onClick={handleLogout}
+            title={collapsed ? 'Sign out' : undefined}
+          >
             <IconLogout /> <span className="label">Sign out</span>
           </FooterButton>
         </SidebarFooter>
@@ -344,16 +543,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <Main>
         <Topbar>
           <TopbarLeft>
-            <IconButton
+            <HamburgerToggle
+              $variant="ghost"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={mobileNavOpen}
+            >
+              <IconMenu />
+            </HamburgerToggle>
+            <SidebarToggle
               $variant="ghost"
               onClick={() => setCollapsed(c => !c)}
               aria-label="Toggle sidebar"
               style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
             >
               <IconChevronLeft />
-            </IconButton>
+            </SidebarToggle>
             <Crumbs>
-              <span>Workspace</span>
+              <span className="prefix">Workspace</span>
               <span className="sep">/</span>
               <span className="here">{currentLabel}</span>
             </Crumbs>
@@ -365,9 +572,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </StatusPill>
             <Clock>
               <IconClock />
-              <span>{format(currentDate, 'EEE, MMM d')}</span>
-              <span style={{ color: 'var(--text-3)' }}>·</span>
-              <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{format(currentDate, 'HH:mm')}</span>
+              <span className="day">{format(currentDate, 'EEE, MMM d')}</span>
+              <span className="sep">·</span>
+              <span className="time">{format(currentDate, 'HH:mm')}</span>
             </Clock>
           </TopbarRight>
         </Topbar>

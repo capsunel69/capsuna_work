@@ -28,6 +28,12 @@ const MeetingRow = styled.div<{ $done?: boolean }>`
   &:hover { background: var(--bg-3); }
 
   ${p => p.$done && `opacity: 0.7;`}
+
+  @media (max-width: 720px) {
+    padding: var(--s-3);
+    gap: var(--s-2);
+    flex-wrap: wrap;
+  }
 `;
 
 const Title = styled.h3<{ $done?: boolean }>`
@@ -86,6 +92,13 @@ const Actions = styled.div`
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+
+  @media (max-width: 720px) {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
 `;
 
 const Meetings: React.FC = () => {
