@@ -418,6 +418,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return localStorage.getItem('sidebarCollapsed') === '1';
   });
   const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= MOBILE_BP;
+  });
 
   // Register the mobile drawer in the global overlay stack so the chat
   // bubble auto-hides while it's open.
@@ -431,6 +435,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const t = setInterval(() => setCurrentDate(new Date()), 30_000);
     return () => clearInterval(t);
   }, [setCurrentDate]);
+
+  // Keep a tiny viewport flag so mobile drawer always renders expanded
+  // content, regardless of desktop collapsed preference.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = (): void => setIsMobileViewport(window.innerWidth <= MOBILE_BP);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Close drawer on route change so users don't see it linger after a tap.
   useEffect(() => {
@@ -481,6 +495,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (window.confirm('Sign out of the control panel?')) logout();
   }, [logout]);
 
+  const navCollapsed = isMobileViewport ? false : collapsed;
+
   return (
     <Shell $collapsed={collapsed}>
       <Backdrop
@@ -492,7 +508,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         $mobileOpen={mobileNavOpen}
         aria-label="Primary navigation"
       >
-        <Brand $collapsed={collapsed}>
+        <Brand $collapsed={navCollapsed}>
           <div className="logo"><IconSpark /></div>
           <div className="name">
             <strong>Capsuna</strong>
@@ -508,7 +524,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </IconButton>
         </Brand>
 
-        <SidebarSectionLabel $collapsed={collapsed}>Workspace</SidebarSectionLabel>
+        <SidebarSectionLabel $collapsed={navCollapsed}>Workspace</SidebarSectionLabel>
         <Nav>
           {NAV_PRIMARY.map(item => {
             const Icon = item.icon;
@@ -518,8 +534,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 key={item.to}
                 to={item.to}
                 $active={active}
-                $collapsed={collapsed}
-                title={collapsed ? item.label : undefined}
+                $collapsed={navCollapsed}
+                title={navCollapsed ? item.label : undefined}
                 onClick={() => setMobileNavOpen(false)}
               >
                 <Icon />
@@ -531,9 +547,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         <SidebarFooter>
           <FooterButton
-            $collapsed={collapsed}
+            $collapsed={navCollapsed}
             onClick={handleLogout}
-            title={collapsed ? 'Sign out' : undefined}
+            title={navCollapsed ? 'Sign out' : undefined}
           >
             <IconLogout /> <span className="label">Sign out</span>
           </FooterButton>

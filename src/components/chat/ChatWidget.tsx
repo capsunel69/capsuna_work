@@ -243,6 +243,16 @@ const HeaderChip = styled.button`
   svg { width: 13px; height: 13px; }
 `;
 
+const VoiceChipMarker = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  line-height: 1;
+  font-size: 12px;
+  transform: translateY(-0.5px);
+`;
+
 const LiveDot = styled.span<{ $live: boolean }>`
   width: 7px;
   height: 7px;
@@ -702,6 +712,11 @@ function lastAssistantText(steps: AgentStep[]): string {
   return '';
 }
 
+function isAutoplayBlockedError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /not allowed|denied|user agent|platform/i.test(message);
+}
+
 const ChatWidget: React.FC = () => {
   const { turns, status, send, abort, reset, isOpen, open, close, instanceId, setInstanceId } = useChat();
   const overlayCount = useOverlayCount();
@@ -833,10 +848,22 @@ const ChatWidget: React.FC = () => {
         };
         setPendingTtsTurnId(null);
         setPlayingTurnId(turnId);
-        await el.play();
+        try {
+          await el.play();
+        } catch (err) {
+          // iOS/Safari can block non-user-gesture autoplay. This isn't a real
+          // runtime error; user can still tap the per-turn play chip.
+          if (isAutoplayBlockedError(err)) {
+            setPlayingTurnId((p) => (p === turnId ? null : p));
+            return;
+          }
+          throw err;
+        }
       } catch (err) {
         setPendingTtsTurnId(null);
-        setVoiceError(err instanceof Error ? err.message : String(err));
+        if (!isAutoplayBlockedError(err)) {
+          setVoiceError(err instanceof Error ? err.message : String(err));
+        }
       }
     },
     [stopPlayback, ttsAvailable, activeVoiceId],
@@ -1096,7 +1123,9 @@ const ChatWidget: React.FC = () => {
                   title={`Switch voice (currently ${activeVoice.name})`}
                   aria-label={`Switch voice — currently ${activeVoice.name}`}
                 >
-                  {activeVoice.gender === 'masculine' ? '♂' : activeVoice.gender === 'feminine' ? '♀' : '·'}
+                  <VoiceChipMarker>
+                    {activeVoice.gender === 'masculine' ? '♂' : activeVoice.gender === 'feminine' ? '♀' : '·'}
+                  </VoiceChipMarker>
                   {activeVoice.name}
                 </HeaderChip>
               )}
