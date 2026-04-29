@@ -147,11 +147,14 @@ const Panel = styled.aside`
   transform-origin: bottom right;
 
   @media (max-width: 720px) {
-    right: 8px;
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-    left: 8px;
+    /* Go full-screen on phones so we get the whole viewport for chat. */
+    inset: 0;
     width: auto;
-    height: min(82vh, calc(100vh - 72px));
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: 0;
+    border-top: 0;
   }
 `;
 
@@ -166,12 +169,18 @@ const Header = styled.header`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border-1);
   flex-shrink: 0;
   background: rgba(7, 9, 13, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+
+  @media (max-width: 720px) {
+    padding: 10px 12px;
+    gap: 6px;
+  }
 `;
 
 const TitleBlock = styled.div`
@@ -179,6 +188,7 @@ const TitleBlock = styled.div`
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 `;
 
 const Avatar = styled.div`
@@ -193,6 +203,13 @@ const Avatar = styled.div`
   flex-shrink: 0;
 
   svg { width: 18px; height: 18px; }
+
+  @media (max-width: 720px) {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    svg { width: 16px; height: 16px; }
+  }
 `;
 
 const TitleText = styled.div`
@@ -206,6 +223,9 @@ const TitleText = styled.div`
     font-weight: 600;
     color: var(--text-1);
     letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   span {
     font-size: 11px;
@@ -216,15 +236,25 @@ const TitleText = styled.div`
     gap: 6px;
     margin-top: 2px;
   }
+
+  @media (max-width: 720px) {
+    strong { font-size: 13px; }
+    span { font-size: 10.5px; margin-top: 1px; }
+  }
 `;
 
 const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+
+  @media (max-width: 720px) {
+    gap: 2px;
+  }
 `;
 
-const HeaderChip = styled.button`
+const HeaderChip = styled.button<{ $iconOnly?: boolean }>`
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -238,19 +268,34 @@ const HeaderChip = styled.button`
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 
   &:hover { background: var(--bg-3); color: var(--text-1); border-color: var(--border-2); }
   svg { width: 13px; height: 13px; }
+
+  /* Hide label text on small viewports to avoid header crowding. */
+  @media (max-width: 720px) {
+    height: 30px;
+    padding: ${(p) => (p.$iconOnly ? '0' : '0 8px')};
+    width: ${(p) => (p.$iconOnly ? '30px' : 'auto')};
+    justify-content: center;
+    gap: 4px;
+    font-size: 11px;
+
+    .chip-label { display: none; }
+    svg { width: 14px; height: 14px; }
+  }
 `;
 
 const VoiceChipMarker = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   width: 14px;
+  height: 14px;
+  font-size: 11px;
   line-height: 1;
-  font-size: 12px;
-  transform: translateY(-0.5px);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
 `;
 
 const LiveDot = styled.span<{ $live: boolean }>`
@@ -1094,8 +1139,11 @@ const ChatWidget: React.FC = () => {
                   type="button"
                   onClick={() => setInstanceId(undefined)}
                   title="Switch back to default instance"
+                  aria-label={`Switch back to default instance (current: ${instanceId.slice(0, 6)})`}
+                  $iconOnly
                 >
-                  inst {instanceId.slice(0, 6)} ×
+                  <IconX />
+                  <span className="chip-label">inst {instanceId.slice(0, 6)}</span>
                 </HeaderChip>
               )}
               <HeaderChip
@@ -1107,6 +1155,7 @@ const ChatWidget: React.FC = () => {
                     : 'Voice mode off — turn on for hands-free'
                 }
                 aria-pressed={voiceMode}
+                aria-label={voiceMode ? 'Turn voice mode off' : 'Turn voice mode on'}
                 style={
                   voiceMode
                     ? { color: 'var(--accent)', borderColor: 'var(--accent)' }
@@ -1114,7 +1163,7 @@ const ChatWidget: React.FC = () => {
                 }
               >
                 {voiceMode ? <IconVolume /> : <IconVolumeOff />}
-                Voice
+                <span className="chip-label">Voice</span>
               </HeaderChip>
               {ttsAvailable && availableVoices.length > 1 && activeVoice && (
                 <HeaderChip
@@ -1123,16 +1172,22 @@ const ChatWidget: React.FC = () => {
                   title={`Switch voice (currently ${activeVoice.name})`}
                   aria-label={`Switch voice — currently ${activeVoice.name}`}
                 >
-                  <VoiceChipMarker>
-                    {activeVoice.gender === 'masculine' ? '♂' : activeVoice.gender === 'feminine' ? '♀' : '·'}
+                  <VoiceChipMarker aria-hidden>
+                    {activeVoice.gender === 'masculine' ? 'M' : activeVoice.gender === 'feminine' ? 'F' : '·'}
                   </VoiceChipMarker>
-                  {activeVoice.name}
+                  <span className="chip-label">{activeVoice.name}</span>
                 </HeaderChip>
               )}
               {turns.length > 0 && (
-                <HeaderChip type="button" onClick={reset} title="Reset conversation">
+                <HeaderChip
+                  type="button"
+                  onClick={reset}
+                  title="Reset conversation"
+                  aria-label="Reset conversation"
+                  $iconOnly
+                >
                   <IconRefresh />
-                  Reset
+                  <span className="chip-label">Reset</span>
                 </HeaderChip>
               )}
               <IconButton $variant="ghost" onClick={close} aria-label="Close">

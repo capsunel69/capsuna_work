@@ -1,28 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
-import styled, { keyframes } from 'styled-components';
+import styled from 'styled-components';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
 import { useRegisterOverlay } from '../../hooks/useOverlayStack';
 import BackgroundFx from './BackgroundFx';
 import ChatWidget from '../chat/ChatWidget';
+import MobileNav, { type MobileNavItem } from './MobileNav';
 import {
   IconDashboard, IconTasks, IconCalendar, IconBell, IconNote,
   IconLogout, IconChevronLeft, IconSpark, IconClock, IconBot,
-  IconMenu, IconX,
+  IconMenu,
 } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 
 /* ── Module registry — add a new entry to expose a new section ─────────── */
-type NavItem = {
-  to: string;
-  label: string;
-  icon: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }>;
-};
 
-const NAV_PRIMARY: NavItem[] = [
+const NAV_PRIMARY: MobileNavItem[] = [
   { to: '/',          label: 'Overview',  icon: IconDashboard },
   { to: '/tasks',     label: 'Tasks',     icon: IconTasks },
   { to: '/meetings',  label: 'Meetings',  icon: IconCalendar },
@@ -54,11 +49,6 @@ const Shell = styled.div<{ $collapsed: boolean }>`
   }
 `;
 
-const slideIn = keyframes`
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
-`;
-
 /** Desktop-only sidebar (in the grid). Hidden entirely on mobile so the
  *  layout collapses to a single column without leaving a phantom track. */
 const Sidebar = styled.aside`
@@ -72,39 +62,6 @@ const Sidebar = styled.aside`
   @media (max-width: ${MOBILE_BP}px) {
     display: none;
   }
-`;
-
-/** Mobile drawer — rendered into a portal at document.body so it cannot be
- *  affected by the Shell's stacking context, transforms, or overflow. */
-const MobileBackdrop = styled.div<{ $open: boolean }>`
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 4, 8, 0.55);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
-  z-index: 9998;
-  opacity: ${p => p.$open ? 1 : 0};
-  pointer-events: ${p => p.$open ? 'auto' : 'none'};
-  transition: opacity 0.2s ease-out;
-`;
-
-const MobileDrawer = styled.aside<{ $open: boolean }>`
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 280px;
-  max-width: 86vw;
-  z-index: 9999;
-  background: var(--bg-1);
-  border-right: 1px solid var(--border-1);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transform: translateX(${p => p.$open ? '0' : '-100%'});
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: ${p => p.$open ? '0 24px 64px rgba(0,0,0,0.55)' : 'none'};
-  ${p => p.$open && `animation: ${slideIn} 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);`}
 `;
 
 const Brand = styled.div<{ $collapsed: boolean }>`
@@ -139,16 +96,6 @@ const Brand = styled.div<{ $collapsed: boolean }>`
 
   .name strong { font-size: 13px; font-weight: 600; color: var(--text-1); letter-spacing: 0.02em; }
   .name span { font-size: 10.5px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
-
-  .close-mobile {
-    display: none;
-    margin-left: auto;
-  }
-
-  @media (max-width: ${MOBILE_BP}px) {
-    .name { display: flex; }
-    .close-mobile { display: inline-flex; }
-  }
 `;
 
 const SidebarSectionLabel = styled.div<{ $collapsed: boolean }>`
@@ -159,10 +106,6 @@ const SidebarSectionLabel = styled.div<{ $collapsed: boolean }>`
   color: var(--text-3);
   letter-spacing: 0.08em;
   padding: var(--s-3) var(--s-5) var(--s-2);
-
-  @media (max-width: ${MOBILE_BP}px) {
-    display: block;
-  }
 `;
 
 const Nav = styled.nav`
@@ -208,13 +151,6 @@ const NavLinkStyled = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
 
   svg { width: 18px; height: 18px; flex-shrink: 0; }
   .label { display: ${p => p.$collapsed ? 'none' : 'inline'}; }
-
-  @media (max-width: ${MOBILE_BP}px) {
-    padding: 12px 14px;
-    font-size: 14px;
-    min-height: 44px;
-    .label { display: inline; }
-  }
 `;
 
 const SidebarFooter = styled.div`
@@ -242,14 +178,6 @@ const FooterButton = styled.button<{ $collapsed: boolean }>`
 
   svg { width: 18px; height: 18px; flex-shrink: 0; }
   .label { display: ${p => p.$collapsed ? 'none' : 'inline'}; }
-
-  @media (max-width: ${MOBILE_BP}px) {
-    padding: 12px 14px;
-    font-size: 14px;
-    min-height: 44px;
-    justify-content: flex-start;
-    .label { display: inline; }
-  }
 `;
 
 /* ── Topbar / content ──────────────────────────────────────────────────── */
@@ -275,6 +203,8 @@ const Topbar = styled.header`
   -webkit-backdrop-filter: blur(10px);
   flex-shrink: 0;
   gap: var(--s-3);
+  position: relative;
+  z-index: 5;
 
   @media (max-width: ${MOBILE_BP}px) {
     padding: 0 var(--s-3);
@@ -301,6 +231,11 @@ const HamburgerToggle = styled(IconButton)`
 
   @media (max-width: ${MOBILE_BP}px) {
     display: inline-flex;
+    /* Slightly larger hit area on touch devices. */
+    width: 40px;
+    height: 40px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 `;
 
@@ -446,27 +381,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
-  // Lock body scroll while the drawer is open (prevents background scroll
-  // on iOS / Android when the drawer is taller than the viewport).
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobileNavOpen]);
-
-  // Close the drawer on Esc.
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setMobileNavOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [mobileNavOpen]);
-
   // Auto-close the drawer if the viewport grows past the breakpoint.
   useEffect(() => {
     if (typeof window === 'undefined' || !mobileNavOpen) return;
@@ -490,89 +404,55 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (window.confirm('Sign out of the control panel?')) logout();
   }, [logout]);
 
-  const renderNavContent = (forMobile: boolean): React.ReactElement => {
-    const isCollapsed = forMobile ? false : collapsed;
-    return (
-      <>
-        <Brand $collapsed={isCollapsed}>
-          <div className="logo"><IconSpark /></div>
-          <div className="name">
-            <strong>Capsuna</strong>
-            <span>control panel</span>
-          </div>
-          {forMobile && (
-            <IconButton
-              className="close-mobile"
-              $variant="ghost"
-              onClick={() => setMobileNavOpen(false)}
-              aria-label="Close menu"
-            >
-              <IconX />
-            </IconButton>
-          )}
-        </Brand>
+  const closeMobileNav = useCallback(() => {
+    setMobileNavOpen(false);
+  }, []);
 
-        <SidebarSectionLabel $collapsed={isCollapsed}>Workspace</SidebarSectionLabel>
-        <Nav>
-          {NAV_PRIMARY.map(item => {
-            const Icon = item.icon;
-            const active = location.pathname === item.to;
-            return (
-              <NavLinkStyled
-                key={item.to}
-                to={item.to}
-                $active={active}
-                $collapsed={isCollapsed}
-                title={isCollapsed ? item.label : undefined}
-                onClick={() => setMobileNavOpen(false)}
-              >
-                <Icon />
-                <span className="label">{item.label}</span>
-              </NavLinkStyled>
-            );
-          })}
-        </Nav>
-
-        <SidebarFooter>
-          <FooterButton
-            $collapsed={isCollapsed}
-            onClick={handleLogout}
-            title={isCollapsed ? 'Sign out' : undefined}
-          >
-            <IconLogout /> <span className="label">Sign out</span>
-          </FooterButton>
-        </SidebarFooter>
-      </>
-    );
-  };
-
-  const mobileDrawerPortal = typeof document !== 'undefined' && mobileNavOpen
-    ? createPortal(
-        <>
-          <MobileBackdrop
-            $open={mobileNavOpen}
-            onClick={() => setMobileNavOpen(false)}
-            aria-hidden="true"
-          />
-          <MobileDrawer
-            $open={mobileNavOpen}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Primary navigation"
-          >
-            {renderNavContent(true)}
-          </MobileDrawer>
-        </>,
-        document.body,
-      )
-    : null;
+  const openMobileNav = useCallback(() => {
+    setMobileNavOpen(true);
+  }, []);
 
   return (
     <>
-      {mobileDrawerPortal}
       <Shell $collapsed={collapsed}>
         <Sidebar aria-label="Primary navigation">
-          {renderNavContent(false)}
+          <Brand $collapsed={collapsed}>
+            <div className="logo"><IconSpark /></div>
+            <div className="name">
+              <strong>Capsuna</strong>
+              <span>control panel</span>
+            </div>
+          </Brand>
+
+          <SidebarSectionLabel $collapsed={collapsed}>Workspace</SidebarSectionLabel>
+          <Nav>
+            {NAV_PRIMARY.map(item => {
+              const Icon = item.icon;
+              const active = location.pathname === item.to;
+              return (
+                <NavLinkStyled
+                  key={item.to}
+                  to={item.to}
+                  $active={active}
+                  $collapsed={collapsed}
+                  title={collapsed ? item.label : undefined}
+                >
+                  <Icon />
+                  <span className="label">{item.label}</span>
+                </NavLinkStyled>
+              );
+            })}
+          </Nav>
+
+          <SidebarFooter>
+            <FooterButton
+              $collapsed={collapsed}
+              onClick={handleLogout}
+              title={collapsed ? 'Sign out' : undefined}
+            >
+              <IconLogout /> <span className="label">Sign out</span>
+            </FooterButton>
+          </SidebarFooter>
         </Sidebar>
 
         <Main>
@@ -581,7 +461,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <HamburgerToggle
                 type="button"
                 $variant="ghost"
-                onClick={() => setMobileNavOpen(true)}
+                onClick={openMobileNav}
                 aria-label="Open navigation"
                 aria-expanded={mobileNavOpen}
               >
@@ -625,6 +505,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <ChatWidget />
         </StickyLayer>
       </Shell>
+
+      <MobileNav
+        open={mobileNavOpen}
+        onClose={closeMobileNav}
+        items={NAV_PRIMARY}
+        activePath={location.pathname}
+        onLogout={handleLogout}
+        logoutIcon={IconLogout}
+      />
     </>
   );
 };
