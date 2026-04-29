@@ -48,12 +48,16 @@ const MODEL_GROUPS: ModelGroup[] = [
     ],
   },
   {
-    label: 'Anthropic · Claude',
+    label: 'Google · Gemini',
     models: [
-      { id: 'anthropic:claude-opus-4-5',          label: 'claude-opus-4.5',          hint: 'top-tier Anthropic' },
-      { id: 'anthropic:claude-sonnet-4-5',        label: 'claude-sonnet-4.5',        hint: 'balanced flagship' },
-      { id: 'anthropic:claude-3-7-sonnet-latest', label: 'claude-3.7-sonnet' },
-      { id: 'anthropic:claude-3-5-haiku-latest',  label: 'claude-3.5-haiku',         hint: 'fast & cheap' },
+      { id: 'google:gemini-2.5-pro',              label: 'gemini-2.5-pro',           hint: 'flagship' },
+      { id: 'google:gemini-2.5-flash',            label: 'gemini-2.5-flash',         hint: 'fast, balanced' },
+      { id: 'google:gemini-2.5-flash-preview-04-17', label: 'gemini-2.5-flash-preview', hint: 'preview' },
+      { id: 'google:gemini-2.0-flash',            label: 'gemini-2.0-flash' },
+      { id: 'google:gemini-2.0-flash-lite',     label: 'gemini-2.0-flash-lite' },
+      { id: 'google:gemini-1.5-pro',              label: 'gemini-1.5-pro' },
+      { id: 'google:gemini-1.5-flash',            label: 'gemini-1.5-flash' },
+      { id: 'google:gemini-1.5-flash-8b',         label: 'gemini-1.5-flash-8b',      hint: 'smallest' },
     ],
   },
 ];
