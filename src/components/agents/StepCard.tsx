@@ -118,6 +118,28 @@ const Toggle = styled.button`
   &:hover { color: var(--text-1); }
 `;
 
+const URL_RE = /(https?:\/\/[^\s<>"'`]+)/g;
+
+function renderWithLinks(text: string): React.ReactNode {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = URL_RE.exec(text)) !== null) {
+    const start = m.index;
+    const url = m[0];
+    if (start > last) out.push(text.slice(last, start));
+    out.push(
+      <a key={`url-${i++}-${start}`} href={url} target="_blank" rel="noopener noreferrer">
+        {url}
+      </a>,
+    );
+    last = start + url.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out.length > 0 ? out : text;
+}
+
 const formatJSON = (value: unknown): string => {
   try {
     return JSON.stringify(value, null, 2);
@@ -160,7 +182,7 @@ function GmailResultPreview({ skill, result }: { skill: string; result: unknown 
               </MailMeta>
               <strong style={{ color: 'var(--text-1)' }}>{sub}</strong>
               {'\n\n'}
-              {body}
+              {renderWithLinks(body)}
             </MailPreview>
           );
         })}
@@ -185,7 +207,7 @@ function GmailResultPreview({ skill, result }: { skill: string; result: unknown 
           {m.date ? ` · ${m.date}` : ''}
         </MailMeta>
         <strong style={{ color: 'var(--text-1)' }}>{m.subject || '(no subject)'}</strong>
-        {body ? `\n\n${body}` : ''}
+        {body ? <>{'\n\n'}{renderWithLinks(body)}</> : ''}
       </MailPreview>
     );
   }
@@ -209,7 +231,7 @@ const StepCard: React.FC<StepCardProps> = ({ step }) => {
   switch (step.kind) {
     case 'message':
       if (step.role === 'user') return <UserBubble>{step.content}</UserBubble>;
-      return <AssistantBubble>{step.content}</AssistantBubble>;
+      return <AssistantBubble>{renderWithLinks(step.content)}</AssistantBubble>;
 
     case 'thought':
       return <ThoughtLine>{step.text}</ThoughtLine>;
