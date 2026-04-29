@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { format } from 'date-fns';
@@ -552,28 +551,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {renderNavContent(false)}
       </Sidebar>
 
-      {typeof document !== 'undefined' && createPortal(
-        <>
-          <MobileBackdrop
-            $open={mobileNavOpen}
-            onClick={() => setMobileNavOpen(false)}
-            aria-hidden="true"
-          />
-          <MobileDrawer
-            $open={mobileNavOpen}
-            aria-label="Primary navigation"
-            aria-hidden={!mobileNavOpen}
-          >
-            {renderNavContent(true)}
-          </MobileDrawer>
-        </>,
-        document.body,
-      )}
+      <MobileBackdrop
+        $open={mobileNavOpen}
+        onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
+      />
+      <MobileDrawer
+        $open={mobileNavOpen}
+        aria-label="Primary navigation"
+      >
+        {renderNavContent(true)}
+      </MobileDrawer>
 
       <Main>
         <Topbar>
           <TopbarLeft>
             <HamburgerToggle
+              type="button"
               $variant="ghost"
               onClick={() => setMobileNavOpen(true)}
               aria-label="Open navigation"
