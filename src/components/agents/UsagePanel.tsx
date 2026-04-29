@@ -12,12 +12,12 @@ import {
 } from '../../services/piovra';
 
 type Window = 7 | 30 | 90 | 365 | 0;
-const WINDOW_OPTIONS: { value: Window; label: string }[] = [
-  { value: 7,   label: 'Last 7 days' },
-  { value: 30,  label: 'Last 30 days' },
-  { value: 90,  label: 'Last 90 days' },
-  { value: 365, label: 'Last year' },
-  { value: 0,   label: 'All time' },
+const WINDOW_OPTIONS: { value: Window; label: string; full: string }[] = [
+  { value: 7,   label: '7d',  full: 'Last 7 days' },
+  { value: 30,  label: '30d', full: 'Last 30 days' },
+  { value: 90,  label: '90d', full: 'Last 90 days' },
+  { value: 365, label: '1y',  full: 'Last year' },
+  { value: 0,   label: 'All', full: 'All time' },
 ];
 
 /* ── Layout ────────────────────────────────────────────────────────────── */
@@ -34,24 +34,47 @@ const Toolbar = styled.div`
   gap: var(--s-3);
   padding: var(--s-3) var(--s-5);
   border-bottom: 1px solid var(--border-1);
+  flex-wrap: wrap;
 
   @media (max-width: 760px) { padding: var(--s-3) var(--s-4); }
 `;
 
 const ToolbarLabel = styled.span`
-  font-size: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-3);
 `;
 
-const WindowSelect = styled.select`
-  height: 32px;
-  background: var(--bg-2);
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-sm);
-  color: var(--text-1);
-  font-size: 13px;
-  padding: 0 10px;
-  &:focus { border-color: var(--accent); outline: none; }
+const Segmented = styled.div`
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+`;
+
+const Seg = styled.button<{ $active: boolean }>`
+  position: relative;
+  border: 0;
+  background: ${(p) => (p.$active ? 'var(--accent-soft)' : 'transparent')};
+  color: ${(p) => (p.$active ? 'var(--accent)' : 'var(--text-3)')};
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: ${(p) => (p.$active ? 600 : 500)};
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+  white-space: nowrap;
+
+  &:hover { color: var(--text-1); }
+  &:active { transform: translateY(1px); }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 `;
 
 const StatGrid = styled.div`
@@ -236,14 +259,20 @@ const UsagePanel: React.FC<UsagePanelProps> = () => {
 
         <Toolbar>
           <ToolbarLabel>Window</ToolbarLabel>
-          <WindowSelect
-            value={windowDays}
-            onChange={(e) => setWindowDays(Number(e.target.value) as Window)}
-          >
+          <Segmented role="tablist" aria-label="Time window">
             {WINDOW_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <Seg
+                key={o.value}
+                role="tab"
+                aria-selected={windowDays === o.value}
+                $active={windowDays === o.value}
+                onClick={() => setWindowDays(o.value)}
+                title={o.full}
+              >
+                {o.label}
+              </Seg>
             ))}
-          </WindowSelect>
+          </Segmented>
         </Toolbar>
 
         {err && (
