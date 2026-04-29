@@ -305,7 +305,17 @@ function formatTaskLine(t: Task): string {
   if (t.dueDate) parts.push(`dueDate=${toIso(t.dueDate)}`);
   if (t.completedAt) parts.push(`completedAt=${toIso(t.completedAt)}`);
   if (t.description?.trim()) parts.push(`description="${truncate(oneLine(t.description), 160)}"`);
-  return parts.join(' · ');
+  let line = parts.join(' · ');
+  if (t.subtasks && t.subtasks.length > 0) {
+    const children = t.subtasks
+      .map(
+        (s) =>
+          `    - [${s.id}] ${s.completed ? '[x]' : '[ ]'} "${truncate(oneLine(s.title), 120)}"`,
+      )
+      .join('\n');
+    line += `\n  subtasks (${t.subtasks.filter((s) => s.completed).length}/${t.subtasks.length}):\n${children}`;
+  }
+  return line;
 }
 
 function formatMeetingLine(m: Meeting): string {
