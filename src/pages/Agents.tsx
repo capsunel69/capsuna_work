@@ -4,15 +4,16 @@ import { useSearchParams } from 'react-router-dom';
 import {
   PageContainer, PageHeader, PageTitle, PageSubtitle,
 } from '../components/ui/primitives';
-import { IconBot, IconTerminal, IconClock, IconSettings, IconSend, IconNote } from '../components/ui/icons';
+import { IconBot, IconTerminal, IconClock, IconSettings, IconSend, IconNote, IconSpark } from '../components/ui/icons';
 import DefinitionsList from '../components/agents/DefinitionsList';
 import InstancesList from '../components/agents/InstancesList';
 import RunsList from '../components/agents/RunsList';
 import JobsList from '../components/agents/JobsList';
 import ReportsList from '../components/agents/ReportsList';
+import UsagePanel from '../components/agents/UsagePanel';
 import { useChat } from '../context/ChatContext';
 
-type Tab = 'agents' | 'instances' | 'schedules' | 'reports' | 'runs';
+type Tab = 'agents' | 'instances' | 'schedules' | 'reports' | 'runs' | 'usage';
 
 const TABS: {
   id: Tab;
@@ -25,6 +26,7 @@ const TABS: {
   { id: 'schedules', label: 'Schedules', icon: IconClock,    hint: 'Cron-driven recurring jobs'         },
   { id: 'reports',   label: 'Reports',   icon: IconNote,     hint: 'Outputs from scheduled agent runs'  },
   { id: 'runs',      label: 'Runs',      icon: IconTerminal, hint: 'Full execution history with steps'  },
+  { id: 'usage',     label: 'Usage',     icon: IconSpark,    hint: 'Token consumption + estimated cost per model and instance' },
 ];
 
 const isTab = (v: string | null): v is Tab => !!v && TABS.some((t) => t.id === v);
@@ -195,6 +197,7 @@ const Agents: React.FC = () => {
       case 'schedules': return <JobsList />;
       case 'reports':   return <ReportsList />;
       case 'runs':      return <RunsList />;
+      case 'usage':     return <UsagePanel />;
     }
   }, [tab]);
 

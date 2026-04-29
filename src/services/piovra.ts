@@ -62,6 +62,35 @@ export interface AgentRun {
   endedAt: string | null;
 }
 
+export interface UsageTotals {
+  runs: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  unknownPricingRows: number;
+}
+
+export interface UsageByModelRow {
+  model: string;
+  runs: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number | null;
+  hasPricing: boolean;
+  lastRunAt: string | null;
+}
+
+export interface UsageByInstanceRow extends UsageByModelRow {
+  instanceId: string;
+  instanceName: string;
+  definitionName: string;
+}
+
+export interface UsageResponse<T> {
+  rows: T[];
+  totals: UsageTotals;
+}
+
 export interface SkillDescriptor {
   id: string;
   description: string;
@@ -203,6 +232,13 @@ export const PiovraAPI = {
   getRun: (id: string): Promise<AgentRun> => getJson(`/runs/${id}`),
 
   listSkills: (): Promise<SkillDescriptor[]> => getJson('/skills'),
+
+  getUsageByModel: (sinceDays?: number): Promise<UsageResponse<UsageByModelRow>> =>
+    getJson(`/usage/by-model${sinceDays ? `?sinceDays=${sinceDays}` : ''}`),
+  getUsageByInstance: (
+    sinceDays?: number,
+  ): Promise<UsageResponse<UsageByInstanceRow>> =>
+    getJson(`/usage/by-instance${sinceDays ? `?sinceDays=${sinceDays}` : ''}`),
 
   listJobs: (instanceId?: string): Promise<ScheduledJob[]> =>
     getJson(`/jobs${instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : ''}`),
