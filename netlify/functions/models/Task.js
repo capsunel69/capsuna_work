@@ -19,6 +19,25 @@ const TimerSessionSchema = new mongoose.Schema({
   }
 });
 
+const SubtaskSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  completed: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+}, { _id: false });
+
 const TaskSchema = new mongoose.Schema({
   id: {
     type: String,
@@ -58,6 +77,10 @@ const TaskSchema = new mongoose.Schema({
     default: 0
   },
   timers: [TimerSessionSchema],
+  subtasks: {
+    type: [SubtaskSchema],
+    default: []
+  },
   convertedFromReminder: {
     type: String,
     default: null

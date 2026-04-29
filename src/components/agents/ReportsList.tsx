@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -107,9 +107,46 @@ const SubtleLine = styled.div`
 
 /**
  * Output preview — preserves whitespace and basic newlines so markdown-ish
- * agent output reads naturally. Truncated with line-clamp.
+ * agent output reads naturally. When the content exceeds the cap we soften
+ * the cutoff with a CSS mask gradient and surface a "Read more" affordance.
  */
-const OutputPreview = styled.div`
+const PreviewWrap = styled.div`
+  position: relative;
+
+  /* The fade is opt-in via data-overflow so short reports stay crisp. */
+  &[data-overflow='true'] .markdown {
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0.15) 92%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0.15) 92%, transparent 100%);
+  }
+
+  &[data-overflow='true'] .read-more {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const ReadMoreHint = styled.span`
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: linear-gradient(90deg, transparent, var(--bg-2) 30%);
+  border-radius: var(--r-xs);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.18s, transform 0.18s, background 0.15s;
+`;
+
+const OutputMarkdown = styled.div`
   color: var(--text-2);
   font-size: 13px;
   line-height: 1.55;
@@ -159,6 +196,36 @@ const OutputPreview = styled.div`
     text-decoration: underline;
   }
 `;
+
+const ReportPreview: React.FC<{ markdown: string }> = ({ markdown }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = (): void => {
+      // +1 guards against subpixel rounding on different DPR.
+      setOverflowing(el.scrollHeight > el.clientHeight + 1);
+    };
+    check();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [markdown]);
+
+  return (
+    <PreviewWrap data-overflow={overflowing ? 'true' : 'false'}>
+      <OutputMarkdown ref={ref} className="markdown">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+      </OutputMarkdown>
+      <ReadMoreHint className="read-more" aria-hidden>
+        Read more →
+      </ReadMoreHint>
+    </PreviewWrap>
+  );
+};
 
 const ErrorLine = styled.div`
   color: var(--danger);
@@ -339,11 +406,7 @@ const ReportsList: React.FC = () => {
                     {r.error ? (
                       <ErrorLine>{r.error}</ErrorLine>
                     ) : preview ? (
-                      <OutputPreview>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {preview}
-                        </ReactMarkdown>
-                      </OutputPreview>
+                      <ReportPreview markdown={preview} />
                     ) : null}
                   </ReportCard>
                 );

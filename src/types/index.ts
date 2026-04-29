@@ -1,3 +1,10 @@
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: Date;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -9,6 +16,7 @@ export interface Task {
   dueDate?: Date;
   timeSpent: number; // in seconds
   timers: TimerSession[];
+  subtasks?: Subtask[]; // Checklist items belonging to this task
   convertedFromReminder?: string; // ID of the reminder this task was converted from
   order?: number; // For manual sorting/reordering
 }

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { format, isPast } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
+import type { Task } from '../types';
 import LinkifyText from '../components/shared/LinkifyText';
 import LoadingState from '../components/shared/LoadingState';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import TaskEditForm from '../components/TaskEditForm';
+import SubtaskList from '../components/SubtaskList';
 import {
   PageContainer, PageHeader, PageTitle, PageSubtitle,
   Card, CardHeader, CardTitle, CardSubtle, CardBody, CardSection,
@@ -177,9 +179,9 @@ const Tasks: React.FC = () => {
     reset();
   };
 
-  const isOverdue = (task: any) => task.dueDate && !task.completed && isPast(new Date(task.dueDate));
+  const isOverdue = (task: Task) => !!task.dueDate && !task.completed && isPast(new Date(task.dueDate));
 
-  const filterTasks = (list: any[]) => list.filter(task => {
+  const filterTasks = (list: Task[]): Task[] => list.filter(task => {
     if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
     if (timeFilter !== 'all') {
       const today = new Date(); today.setHours(0,0,0,0);
@@ -347,6 +349,12 @@ const Tasks: React.FC = () => {
                       <Badge $variant={priorityVariant(task.priority)}>{task.priority}</Badge>
                       {isOverdue(task) && <Badge $variant="danger"><IconAlert /> Overdue</Badge>}
                       {task.convertedFromReminder && <Badge $variant="purple">From reminder</Badge>}
+                      {task.subtasks && task.subtasks.length > 0 && (
+                        <Badge $variant="neutral">
+                          <IconCheck />
+                          {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
+                        </Badge>
+                      )}
                     </TitleRow>
                     {task.description && <Description><LinkifyText text={task.description} /></Description>}
                     {(task.dueDate || task.timeSpent > 0) && (
@@ -355,6 +363,11 @@ const Tasks: React.FC = () => {
                         {task.timeSpent > 0 && <span><IconClock /> {formatTime(task.timeSpent)}</span>}
                       </MetaRow>
                     )}
+                    <SubtaskList
+                      task={task}
+                      onChange={updateTask}
+                      disabled={isUpdatingTask}
+                    />
                   </TaskBody>
                   <Actions>
                     {task.id === activeTaskId ? (
@@ -401,12 +414,19 @@ const Tasks: React.FC = () => {
                     <TitleRow>
                       <Title $done>{task.title}</Title>
                       <Badge $variant={priorityVariant(task.priority)}>{task.priority}</Badge>
+                      {task.subtasks && task.subtasks.length > 0 && (
+                        <Badge $variant="neutral">
+                          <IconCheck />
+                          {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
+                        </Badge>
+                      )}
                     </TitleRow>
                     {task.description && <Description><LinkifyText text={task.description} /></Description>}
                     <MetaRow>
                       {task.timeSpent > 0 && <span><IconClock /> {formatTime(task.timeSpent)}</span>}
                       <span>Completed {format(new Date(task.completedAt || task.createdAt), 'MMM d')}</span>
                     </MetaRow>
+                    <SubtaskList task={task} onChange={updateTask} compact />
                   </TaskBody>
                   <Actions>
                     <IconButton $size="sm" $variant="danger" onClick={() => deleteTask(task.id)} title="Delete">
