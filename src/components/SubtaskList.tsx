@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import type { Subtask, Task } from '../types';
 import { Checkbox } from './ui/primitives';
-import { IconPlus, IconTrash } from './ui/icons';
+import { IconPlus, IconTrash, IconEdit, IconCheck, IconX } from './ui/icons';
 
 /**
  * Inline checklist for a Task.
@@ -10,6 +10,12 @@ import { IconPlus, IconTrash } from './ui/icons';
  * The list is intentionally tight (smaller font/padding than the parent task
  * row) so a task with several subtasks still feels like one block instead of
  * a deeply nested tree.
+ *
+ * Editing model: subtask titles are NOT inline-editable on every keystroke
+ * (that caused a save-per-letter pattern that fought with optimistic updates
+ * and stole focus). Instead, the user enters an explicit edit mode via the
+ * pencil button, types freely, then commits with Enter / blur / Save and can
+ * cancel with Esc.
  */
 
 const Wrap = styled.div`
@@ -29,10 +35,10 @@ const Item = styled.div<{ $done?: boolean }>`
   min-height: 28px;
 
   &:hover { background: var(--bg-3); }
-  &:hover .delete { opacity: 1; }
+  &:hover .actions > button { opacity: 1; }
 `;
 
-const ItemTitle = styled.input<{ $done?: boolean }>`
+const TitleText = styled.button<{ $done?: boolean }>`
   flex: 1;
   min-width: 0;
   border: 0;
@@ -42,37 +48,89 @@ const ItemTitle = styled.input<{ $done?: boolean }>`
   color: ${(p) => (p.$done ? 'var(--text-3)' : 'var(--text-1)')};
   text-decoration: ${(p) => (p.$done ? 'line-through' : 'none')};
   padding: 4px 2px;
-  outline: 0;
+  text-align: left;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
-  &:focus {
-    background: var(--bg-2);
+  &:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 2px;
     border-radius: var(--r-xs);
   }
+
+  @media (max-width: 720px) {
+    font-size: 14px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+`;
+
+const EditInput = styled.input<{ $done?: boolean }>`
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--accent);
+  background: var(--bg-2);
+  font: inherit;
+  font-size: 13px;
+  color: ${(p) => (p.$done ? 'var(--text-3)' : 'var(--text-1)')};
+  text-decoration: ${(p) => (p.$done ? 'line-through' : 'none')};
+  padding: 4px 6px;
+  border-radius: var(--r-xs);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--accent-soft);
 
   @media (max-width: 720px) {
     font-size: 16px;
   }
 `;
 
-const DeleteBtn = styled.button`
+const Actions = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+`;
+
+const ActionBtn = styled.button<{ $tone?: 'default' | 'danger' | 'accent' }>`
   opacity: 0;
   background: transparent;
   border: 0;
   padding: 4px;
   border-radius: var(--r-xs);
-  color: var(--text-3);
+  color: ${(p) =>
+    p.$tone === 'danger' ? 'var(--text-3)' :
+    p.$tone === 'accent' ? 'var(--accent)' :
+    'var(--text-3)'};
   cursor: pointer;
   transition: opacity 0.15s, color 0.15s, background 0.15s;
   display: flex;
   align-items: center;
 
-  &:hover { color: var(--danger); background: var(--danger-soft); }
+  &:hover {
+    color: ${(p) =>
+      p.$tone === 'danger' ? 'var(--danger)' :
+      p.$tone === 'accent' ? 'var(--accent-strong)' :
+      'var(--text-1)'};
+    background: ${(p) =>
+      p.$tone === 'danger' ? 'var(--danger-soft)' :
+      p.$tone === 'accent' ? 'var(--accent-soft)' :
+      'var(--bg-2)'};
+  }
+
+  /* While editing the save/cancel buttons are always visible. */
+  &[data-always='true'] {
+    opacity: 1;
+  }
 
   svg { width: 12px; height: 12px; }
 
   /* Always visible on touch devices where there's no hover. */
   @media (hover: none) {
     opacity: 0.6;
+    &[data-always='true'] { opacity: 1; }
   }
 `;
 
@@ -155,6 +213,11 @@ interface Props {
 const SubtaskList: React.FC<Props> = ({ task, onChange, disabled, compact }) => {
   const subtasks = task.subtasks ?? [];
   const [draftTitle, setDraftTitle] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  // True when the user pressed Esc / Cancel and we shouldn't commit on blur.
+  const cancelEditRef = useRef(false);
+  const editInputRef = useRef<HTMLInputElement | null>(null);
   const addInputRef = useRef<HTMLInputElement | null>(null);
 
   const persist = (next: Subtask[]): void => {
@@ -169,13 +232,61 @@ const SubtaskList: React.FC<Props> = ({ task, onChange, disabled, compact }) => 
     );
   };
 
-  const rename = (id: string, title: string): void => {
-    persist(subtasks.map((s) => (s.id === id ? { ...s, title } : s)));
-  };
-
   const remove = (id: string): void => {
+    if (editingId === id) setEditingId(null);
     persist(subtasks.filter((s) => s.id !== id));
   };
+
+  const startEdit = (s: Subtask): void => {
+    cancelEditRef.current = false;
+    setEditDraft(s.title);
+    setEditingId(s.id);
+  };
+
+  const cancelEdit = (): void => {
+    cancelEditRef.current = true;
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const commitEdit = (): void => {
+    if (!editingId || cancelEditRef.current) return;
+    const trimmed = editDraft.trim();
+    const original = subtasks.find((s) => s.id === editingId);
+    if (!original) {
+      setEditingId(null);
+      return;
+    }
+    if (!trimmed) {
+      // Empty title → treat as cancel rather than wiping the row.
+      setEditingId(null);
+      setEditDraft('');
+      return;
+    }
+    if (trimmed !== original.title) {
+      persist(
+        subtasks.map((s) =>
+          s.id === editingId ? { ...s, title: trimmed } : s,
+        ),
+      );
+    }
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  // Focus + select-all when entering edit mode so the existing text is
+  // immediately replaceable.
+  useEffect(() => {
+    if (!editingId) return;
+    const el = editInputRef.current;
+    if (!el) return;
+    // requestAnimationFrame ensures the input is mounted.
+    const handle = requestAnimationFrame(() => {
+      el.focus();
+      el.select();
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [editingId]);
 
   const add = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -216,44 +327,102 @@ const SubtaskList: React.FC<Props> = ({ task, onChange, disabled, compact }) => 
         </Progress>
       )}
 
-      {subtasks.map((s) => (
-        <Item key={s.id} $done={s.completed}>
-          <Checkbox
-            $checked={s.completed}
-            onClick={() => toggle(s.id)}
-            disabled={disabled}
-            aria-label={s.completed ? 'Mark incomplete' : 'Mark complete'}
-          />
-          <ItemTitle
-            value={s.title}
-            $done={s.completed}
-            onChange={(e) => rename(s.id, e.target.value)}
-            onBlur={(e) => {
-              const next = e.target.value.trim();
-              if (next !== s.title) rename(s.id, next || s.title);
-              if (!next) remove(s.id);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                (e.target as HTMLInputElement).blur();
-                requestAnimationFrame(() => addInputRef.current?.focus());
-              }
-            }}
-            disabled={disabled}
-          />
-          <DeleteBtn
-            type="button"
-            className="delete"
-            onClick={() => remove(s.id)}
-            disabled={disabled}
-            aria-label="Delete subtask"
-            title="Delete subtask"
-          >
-            <IconTrash />
-          </DeleteBtn>
-        </Item>
-      ))}
+      {subtasks.map((s) => {
+        const isEditing = editingId === s.id;
+        return (
+          <Item key={s.id} $done={s.completed}>
+            <Checkbox
+              $checked={s.completed}
+              onClick={() => toggle(s.id)}
+              disabled={disabled || isEditing}
+              aria-label={s.completed ? 'Mark incomplete' : 'Mark complete'}
+            />
+
+            {isEditing ? (
+              <>
+                <EditInput
+                  ref={editInputRef}
+                  value={editDraft}
+                  $done={s.completed}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitEdit();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancelEdit();
+                    }
+                  }}
+                  onBlur={() => {
+                    // Defer so a click on Save/Cancel registers first.
+                    setTimeout(() => {
+                      if (editingId === s.id) commitEdit();
+                    }, 0);
+                  }}
+                  aria-label="Edit subtask title"
+                />
+                <Actions className="actions">
+                  <ActionBtn
+                    type="button"
+                    data-always="true"
+                    $tone="accent"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={commitEdit}
+                    aria-label="Save subtask"
+                    title="Save (Enter)"
+                  >
+                    <IconCheck />
+                  </ActionBtn>
+                  <ActionBtn
+                    type="button"
+                    data-always="true"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={cancelEdit}
+                    aria-label="Cancel edit"
+                    title="Cancel (Esc)"
+                  >
+                    <IconX />
+                  </ActionBtn>
+                </Actions>
+              </>
+            ) : (
+              <>
+                <TitleText
+                  type="button"
+                  $done={s.completed}
+                  onClick={() => startEdit(s)}
+                  disabled={disabled}
+                  title="Click to edit"
+                >
+                  {s.title}
+                </TitleText>
+                <Actions className="actions">
+                  <ActionBtn
+                    type="button"
+                    onClick={() => startEdit(s)}
+                    disabled={disabled}
+                    aria-label="Edit subtask"
+                    title="Edit"
+                  >
+                    <IconEdit />
+                  </ActionBtn>
+                  <ActionBtn
+                    type="button"
+                    $tone="danger"
+                    onClick={() => remove(s.id)}
+                    disabled={disabled}
+                    aria-label="Delete subtask"
+                    title="Delete subtask"
+                  >
+                    <IconTrash />
+                  </ActionBtn>
+                </Actions>
+              </>
+            )}
+          </Item>
+        );
+      })}
 
       <AddRow onSubmit={add}>
         <AddIcon><IconPlus /></AddIcon>

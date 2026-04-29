@@ -1028,7 +1028,10 @@ const ChatWidget: React.FC = () => {
     setValue('');
     setPending([]);
     for (const p of toSend) URL.revokeObjectURL(p.preview);
-    autoGrow(textareaRef.current);
+    // Wait for React to flush the empty value into the DOM before remeasuring
+    // — otherwise scrollHeight still reflects the just-sent message and the
+    // textarea stays tall.
+    requestAnimationFrame(() => autoGrow(textareaRef.current));
     void send(text, images);
   };
 
