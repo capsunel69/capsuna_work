@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { format } from 'date-fns';
@@ -545,74 +546,86 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   };
 
+  const mobileDrawerPortal = typeof document !== 'undefined' && mobileNavOpen
+    ? createPortal(
+        <>
+          <MobileBackdrop
+            $open={mobileNavOpen}
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+          <MobileDrawer
+            $open={mobileNavOpen}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Primary navigation"
+          >
+            {renderNavContent(true)}
+          </MobileDrawer>
+        </>,
+        document.body,
+      )
+    : null;
+
   return (
-    <Shell $collapsed={collapsed}>
-      <Sidebar aria-label="Primary navigation">
-        {renderNavContent(false)}
-      </Sidebar>
+    <>
+      {mobileDrawerPortal}
+      <Shell $collapsed={collapsed}>
+        <Sidebar aria-label="Primary navigation">
+          {renderNavContent(false)}
+        </Sidebar>
 
-      <MobileBackdrop
-        $open={mobileNavOpen}
-        onClick={() => setMobileNavOpen(false)}
-        aria-hidden="true"
-      />
-      <MobileDrawer
-        $open={mobileNavOpen}
-        aria-label="Primary navigation"
-      >
-        {renderNavContent(true)}
-      </MobileDrawer>
+        <Main>
+          <Topbar>
+            <TopbarLeft>
+              <HamburgerToggle
+                type="button"
+                $variant="ghost"
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Open navigation"
+                aria-expanded={mobileNavOpen}
+              >
+                <IconMenu />
+              </HamburgerToggle>
+              <SidebarToggle
+                $variant="ghost"
+                onClick={() => setCollapsed(c => !c)}
+                aria-label="Toggle sidebar"
+                style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
+              >
+                <IconChevronLeft />
+              </SidebarToggle>
+              <Crumbs>
+                <span className="prefix">Workspace</span>
+                <span className="sep">/</span>
+                <span className="here">{currentLabel}</span>
+              </Crumbs>
+            </TopbarLeft>
+            <TopbarRight>
+              <StatusPill>
+                <span className="dot" />
+                <span>SYSTEMS NOMINAL</span>
+              </StatusPill>
+              <Clock>
+                <IconClock />
+                <span className="day">{format(currentDate, 'EEE, MMM d')}</span>
+                <span className="sep">·</span>
+                <span className="time">{format(currentDate, 'HH:mm')}</span>
+              </Clock>
+            </TopbarRight>
+          </Topbar>
 
-      <Main>
-        <Topbar>
-          <TopbarLeft>
-            <HamburgerToggle
-              type="button"
-              $variant="ghost"
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Open navigation"
-              aria-expanded={mobileNavOpen}
-            >
-              <IconMenu />
-            </HamburgerToggle>
-            <SidebarToggle
-              $variant="ghost"
-              onClick={() => setCollapsed(c => !c)}
-              aria-label="Toggle sidebar"
-              style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
-            >
-              <IconChevronLeft />
-            </SidebarToggle>
-            <Crumbs>
-              <span className="prefix">Workspace</span>
-              <span className="sep">/</span>
-              <span className="here">{currentLabel}</span>
-            </Crumbs>
-          </TopbarLeft>
-          <TopbarRight>
-            <StatusPill>
-              <span className="dot" />
-              <span>SYSTEMS NOMINAL</span>
-            </StatusPill>
-            <Clock>
-              <IconClock />
-              <span className="day">{format(currentDate, 'EEE, MMM d')}</span>
-              <span className="sep">·</span>
-              <span className="time">{format(currentDate, 'HH:mm')}</span>
-            </Clock>
-          </TopbarRight>
-        </Topbar>
+          <Content>
+            <BackgroundFx />
+            <ContentInner>{children}</ContentInner>
+          </Content>
+        </Main>
 
-        <Content>
-          <BackgroundFx />
-          <ContentInner>{children}</ContentInner>
-        </Content>
-      </Main>
-
-      <StickyLayer>
-        <ChatWidget />
-      </StickyLayer>
-    </Shell>
+        <StickyLayer>
+          <ChatWidget />
+        </StickyLayer>
+      </Shell>
+    </>
   );
 };
 
