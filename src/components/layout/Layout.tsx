@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { format } from 'date-fns';
@@ -58,12 +59,9 @@ const slideIn = keyframes`
   to   { transform: translateX(0); }
 `;
 
-const fadeIn = keyframes`
-  from { opacity: 0; }
-  to   { opacity: 1; }
-`;
-
-const Sidebar = styled.aside<{ $mobileOpen: boolean }>`
+/** Desktop-only sidebar (in the grid). Hidden entirely on mobile so the
+ *  layout collapses to a single column without leaving a phantom track. */
+const Sidebar = styled.aside`
   background: var(--bg-1);
   border-right: 1px solid var(--border-1);
   display: flex;
@@ -72,30 +70,41 @@ const Sidebar = styled.aside<{ $mobileOpen: boolean }>`
   min-width: 0;
 
   @media (max-width: ${MOBILE_BP}px) {
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: min(280px, 86vw);
-    z-index: 250;
-    transform: translateX(${p => p.$mobileOpen ? '0' : '-100%'});
-    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-    box-shadow: ${p => p.$mobileOpen ? '0 24px 64px rgba(0,0,0,0.55)' : 'none'};
-    ${p => p.$mobileOpen && `animation: ${slideIn} 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);`}
+    display: none;
   }
 `;
 
-const Backdrop = styled.div<{ $open: boolean }>`
-  display: none;
+/** Mobile drawer — rendered into a portal at document.body so it cannot be
+ *  affected by the Shell's stacking context, transforms, or overflow. */
+const MobileBackdrop = styled.div<{ $open: boolean }>`
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 4, 8, 0.55);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+  opacity: ${p => p.$open ? 1 : 0};
+  pointer-events: ${p => p.$open ? 'auto' : 'none'};
+  transition: opacity 0.2s ease-out;
+`;
 
-  @media (max-width: ${MOBILE_BP}px) {
-    display: ${p => p.$open ? 'block' : 'none'};
-    position: fixed;
-    inset: 0;
-    background: rgba(2, 4, 8, 0.55);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    z-index: 240;
-    animation: ${fadeIn} 0.2s ease-out;
-  }
+const MobileDrawer = styled.aside<{ $open: boolean }>`
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 86vw;
+  z-index: 9999;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border-1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(${p => p.$open ? '0' : '-100%'});
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: ${p => p.$open ? '0 24px 64px rgba(0,0,0,0.55)' : 'none'};
+  ${p => p.$open && `animation: ${slideIn} 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);`}
 `;
 
 const Brand = styled.div<{ $collapsed: boolean }>`
@@ -418,10 +427,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return localStorage.getItem('sidebarCollapsed') === '1';
   });
   const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
-  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.innerWidth <= MOBILE_BP;
-  });
 
   // Register the mobile drawer in the global overlay stack so the chat
   // bubble auto-hides while it's open.
@@ -435,16 +440,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const t = setInterval(() => setCurrentDate(new Date()), 30_000);
     return () => clearInterval(t);
   }, [setCurrentDate]);
-
-  // Keep a tiny viewport flag so mobile drawer always renders expanded
-  // content, regardless of desktop collapsed preference.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const onResize = (): void => setIsMobileViewport(window.innerWidth <= MOBILE_BP);
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   // Close drawer on route change so users don't see it linger after a tap.
   useEffect(() => {
@@ -495,36 +490,29 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (window.confirm('Sign out of the control panel?')) logout();
   }, [logout]);
 
-  const navCollapsed = isMobileViewport ? false : collapsed;
-
-  return (
-    <Shell $collapsed={collapsed}>
-      <Backdrop
-        $open={mobileNavOpen}
-        onClick={() => setMobileNavOpen(false)}
-        aria-hidden="true"
-      />
-      <Sidebar
-        $mobileOpen={mobileNavOpen}
-        aria-label="Primary navigation"
-      >
-        <Brand $collapsed={navCollapsed}>
+  const renderNavContent = (forMobile: boolean): React.ReactElement => {
+    const isCollapsed = forMobile ? false : collapsed;
+    return (
+      <>
+        <Brand $collapsed={isCollapsed}>
           <div className="logo"><IconSpark /></div>
           <div className="name">
             <strong>Capsuna</strong>
             <span>control panel</span>
           </div>
-          <IconButton
-            className="close-mobile"
-            $variant="ghost"
-            onClick={() => setMobileNavOpen(false)}
-            aria-label="Close menu"
-          >
-            <IconX />
-          </IconButton>
+          {forMobile && (
+            <IconButton
+              className="close-mobile"
+              $variant="ghost"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Close menu"
+            >
+              <IconX />
+            </IconButton>
+          )}
         </Brand>
 
-        <SidebarSectionLabel $collapsed={navCollapsed}>Workspace</SidebarSectionLabel>
+        <SidebarSectionLabel $collapsed={isCollapsed}>Workspace</SidebarSectionLabel>
         <Nav>
           {NAV_PRIMARY.map(item => {
             const Icon = item.icon;
@@ -534,8 +522,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 key={item.to}
                 to={item.to}
                 $active={active}
-                $collapsed={navCollapsed}
-                title={navCollapsed ? item.label : undefined}
+                $collapsed={isCollapsed}
+                title={isCollapsed ? item.label : undefined}
                 onClick={() => setMobileNavOpen(false)}
               >
                 <Icon />
@@ -547,14 +535,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         <SidebarFooter>
           <FooterButton
-            $collapsed={navCollapsed}
+            $collapsed={isCollapsed}
             onClick={handleLogout}
-            title={navCollapsed ? 'Sign out' : undefined}
+            title={isCollapsed ? 'Sign out' : undefined}
           >
             <IconLogout /> <span className="label">Sign out</span>
           </FooterButton>
         </SidebarFooter>
+      </>
+    );
+  };
+
+  return (
+    <Shell $collapsed={collapsed}>
+      <Sidebar aria-label="Primary navigation">
+        {renderNavContent(false)}
       </Sidebar>
+
+      {typeof document !== 'undefined' && createPortal(
+        <>
+          <MobileBackdrop
+            $open={mobileNavOpen}
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+          <MobileDrawer
+            $open={mobileNavOpen}
+            aria-label="Primary navigation"
+            aria-hidden={!mobileNavOpen}
+          >
+            {renderNavContent(true)}
+          </MobileDrawer>
+        </>,
+        document.body,
+      )}
 
       <Main>
         <Topbar>
