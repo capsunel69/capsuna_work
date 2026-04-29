@@ -1,11 +1,27 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { IconButton, Spinner } from '../ui/primitives';
-import { IconBot, IconSend, IconStop, IconRefresh, IconX, IconImage } from '../ui/icons';
+import {
+  IconBot,
+  IconSend,
+  IconStop,
+  IconRefresh,
+  IconX,
+  IconImage,
+  IconMic,
+  IconMicOff,
+  IconVolume,
+  IconVolumeOff,
+  IconPlay,
+  IconPause,
+  IconAlert,
+} from '../ui/icons';
 import StepCard from '../agents/StepCard';
 import { useChat } from '../../context/ChatContext';
 import { useOverlayCount } from '../../hooks/useOverlayStack';
-import type { OrchestrateUserImage } from '../../services/piovra';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { VoiceAPI, type VoiceCapabilities } from '../../services/voice';
+import type { AgentStep, OrchestrateUserImage } from '../../services/piovra';
 import {
   ORCHESTRATE_IMAGE_MAX_COUNT,
   filesToOrchestrateImages,
@@ -520,6 +536,154 @@ const Hint = styled.div`
   font-family: var(--font-mono);
 `;
 
+const recPulse = keyframes`
+  0%   { box-shadow: 0 0 0 0 rgba(255, 93, 108, 0.55); }
+  70%  { box-shadow: 0 0 0 10px rgba(255, 93, 108, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 93, 108, 0); }
+`;
+
+const MicButton = styled.button<{ $recording: boolean; $busy: boolean }>`
+  width: 38px;
+  height: 38px;
+  margin: 3px 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+
+  ${(p) =>
+    p.$recording &&
+    css`
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #0b0306;
+      animation: ${recPulse} 1.4s ease-out infinite;
+    `}
+
+  ${(p) =>
+    p.$busy &&
+    !p.$recording &&
+    css`
+      opacity: 0.8;
+      cursor: progress;
+    `}
+
+  &:hover:not(:disabled):not([data-recording='true']) {
+    background: var(--bg-3);
+    border-color: var(--border-1);
+    color: var(--text-1);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
+const RecBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 6px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+    animation: ${recPulse} 1.4s ease-out infinite;
+  }
+`;
+
+const VoiceNotice = styled.div`
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 93, 108, 0.3);
+  background: var(--danger-soft, rgba(255, 93, 108, 0.08));
+  color: var(--text-1);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  svg {
+    color: var(--danger);
+    flex-shrink: 0;
+    margin-top: 1px;
+    width: 14px;
+    height: 14px;
+  }
+
+  strong {
+    color: var(--text-1);
+    font-weight: 600;
+  }
+
+  button {
+    margin-left: auto;
+    background: transparent;
+    border: 0;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 2px;
+    align-self: flex-start;
+    &:hover {
+      color: var(--text-1);
+    }
+    svg {
+      width: 12px;
+      height: 12px;
+      color: currentColor;
+    }
+  }
+`;
+
+const PlayChip = styled.button<{ $playing?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  background: ${(p) => (p.$playing ? 'var(--accent-soft)' : 'var(--bg-2)')};
+  color: ${(p) => (p.$playing ? 'var(--accent)' : 'var(--text-3)')};
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--bg-3);
+    color: var(--text-1);
+    border-color: var(--border-1);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 10px;
+    height: 10px;
+  }
+`;
+
 /* ── Component ─────────────────────────────────────────────────────────── */
 
 const SUGGESTIONS = [
@@ -531,6 +695,25 @@ const SUGGESTIONS = [
 ];
 
 type PendingImage = { id: string; preview: string; file: File };
+
+const VOICE_MODE_KEY = 'piovra.chat.voiceMode';
+
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const mm = Math.floor(total / 60).toString().padStart(2, '0');
+  const ss = (total % 60).toString().padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+function lastAssistantText(steps: AgentStep[]): string {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s.kind === 'message' && s.role === 'assistant' && s.content?.trim()) {
+      return s.content;
+    }
+  }
+  return '';
+}
 
 const ChatWidget: React.FC = () => {
   const { turns, status, send, abort, reset, isOpen, open, close, instanceId, setInstanceId } = useChat();
@@ -544,6 +727,148 @@ const ChatWidget: React.FC = () => {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
+
+  /* ── Voice ─────────────────────────────────────────────────────────── */
+  const [voiceCaps, setVoiceCaps] = useState<VoiceCapabilities | null>(null);
+  const [capsError, setCapsError] = useState<string | null>(null);
+  const [voiceMode, setVoiceMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(VOICE_MODE_KEY) === '1';
+  });
+  const [voiceNoticeDismissed, setVoiceNoticeDismissed] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  /** Which turn id is currently playing TTS, plus the underlying audio el. */
+  const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
+  const [pendingTtsTurnId, setPendingTtsTurnId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const spokenTurnsRef = useRef<Set<string>>(new Set());
+  const recorder = useVoiceRecorder({ maxDurationMs: 90_000 });
+
+  useEffect(() => {
+    let cancelled = false;
+    const ctrl = new AbortController();
+    VoiceAPI.getCapabilities(ctrl.signal)
+      .then((c) => {
+        if (!cancelled) setVoiceCaps(c);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCapsError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(VOICE_MODE_KEY, voiceMode ? '1' : '0');
+  }, [voiceMode]);
+
+  const sttAvailable = !!voiceCaps?.stt.available && recorder.isSupported;
+  const ttsAvailable = !!voiceCaps?.tts.available;
+  const voiceFullyAvailable = sttAvailable && ttsAvailable;
+
+  const stopPlayback = useCallback((): void => {
+    const el = audioRef.current;
+    if (el) {
+      try {
+        el.pause();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    audioRef.current = null;
+    setPlayingTurnId(null);
+    setPendingTtsTurnId(null);
+  }, []);
+
+  const playTurnAudio = useCallback(
+    async (turnId: string, text: string): Promise<void> => {
+      if (!ttsAvailable || !text.trim()) return;
+      stopPlayback();
+      setPendingTtsTurnId(turnId);
+      try {
+        const blob = await VoiceAPI.synthesize({
+          text,
+          voice: (voiceCaps?.tts.defaultVoice as 'nova') ?? 'nova',
+          format: 'mp3',
+        });
+        const url = URL.createObjectURL(blob);
+        audioUrlRef.current = url;
+        const el = new Audio(url);
+        audioRef.current = el;
+        el.onended = () => {
+          if (audioUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            audioUrlRef.current = null;
+          }
+          if (audioRef.current === el) audioRef.current = null;
+          setPlayingTurnId((p) => (p === turnId ? null : p));
+        };
+        el.onerror = () => {
+          if (audioUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            audioUrlRef.current = null;
+          }
+          setPlayingTurnId((p) => (p === turnId ? null : p));
+          setVoiceError('Could not play TTS audio.');
+        };
+        setPendingTtsTurnId(null);
+        setPlayingTurnId(turnId);
+        await el.play();
+      } catch (err) {
+        setPendingTtsTurnId(null);
+        setVoiceError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [stopPlayback, ttsAvailable, voiceCaps],
+  );
+
+  const togglePlayTurn = useCallback(
+    (turnId: string, text: string): void => {
+      if (playingTurnId === turnId) {
+        stopPlayback();
+        return;
+      }
+      void playTurnAudio(turnId, text);
+    },
+    [playTurnAudio, playingTurnId, stopPlayback],
+  );
+
+  // Auto-speak newly-completed assistant turns when voice mode is on.
+  useEffect(() => {
+    if (!voiceMode || !ttsAvailable) return;
+    for (const t of turns) {
+      if (t.status !== 'idle') continue;
+      if (spokenTurnsRef.current.has(t.id)) continue;
+      const text = (t.output && t.output.trim()) || lastAssistantText(t.steps);
+      if (!text) continue;
+      spokenTurnsRef.current.add(t.id);
+      void playTurnAudio(t.id, text);
+      break; // only one turn at a time
+    }
+  }, [turns, voiceMode, ttsAvailable, playTurnAudio]);
+
+  // Stop playback / cancel recording when widget closes.
+  useEffect(() => {
+    if (isOpen) return;
+    stopPlayback();
+    if (recorder.state === 'recording') recorder.cancel();
+  }, [isOpen, stopPlayback, recorder]);
+
+  useEffect(() => {
+    return () => {
+      stopPlayback();
+    };
+  }, [stopPlayback]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -646,6 +971,56 @@ const ChatWidget: React.FC = () => {
     void send(text);
   };
 
+  const recording = recorder.state === 'recording' || recorder.state === 'requesting';
+  const micBusy = transcribing || recorder.state === 'requesting';
+  const micDisabled = streaming || (!sttAvailable && voiceNoticeDismissed);
+
+  const handleMicClick = useCallback(async (): Promise<void> => {
+    setVoiceError(null);
+    if (!sttAvailable) {
+      setVoiceNoticeDismissed(false);
+      return;
+    }
+    if (recording) {
+      const blob = await recorder.stop();
+      if (!blob || blob.size < 200) {
+        setTranscribing(false);
+        return;
+      }
+      setTranscribing(true);
+      try {
+        const text = await VoiceAPI.transcribe(blob);
+        setTranscribing(false);
+        if (!text) return;
+        if (voiceMode) {
+          void send(text);
+        } else {
+          setValue((prev) => (prev ? `${prev} ${text}` : text));
+          requestAnimationFrame(() => autoGrow(textareaRef.current));
+          textareaRef.current?.focus();
+        }
+      } catch (err) {
+        setTranscribing(false);
+        setVoiceError(err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
+    if (streaming) return;
+    stopPlayback();
+    void recorder.start();
+  }, [recorder, recording, send, sttAvailable, stopPlayback, streaming, voiceMode]);
+
+  const toggleVoiceMode = useCallback((): void => {
+    setVoiceMode((v) => {
+      const next = !v;
+      if (!next) stopPlayback();
+      else if (!voiceFullyAvailable) {
+        setVoiceNoticeDismissed(false);
+      }
+      return next;
+    });
+  }, [stopPlayback, voiceFullyAvailable]);
+
   return (
     <>
       <HoverRevealWrap $hidden={bubbleHidden}>
@@ -686,6 +1061,24 @@ const ChatWidget: React.FC = () => {
                   inst {instanceId.slice(0, 6)} ×
                 </HeaderChip>
               )}
+              <HeaderChip
+                type="button"
+                onClick={toggleVoiceMode}
+                title={
+                  voiceMode
+                    ? 'Voice mode on — replies are spoken'
+                    : 'Voice mode off — turn on for hands-free'
+                }
+                aria-pressed={voiceMode}
+                style={
+                  voiceMode
+                    ? { color: 'var(--accent)', borderColor: 'var(--accent)' }
+                    : undefined
+                }
+              >
+                {voiceMode ? <IconVolume /> : <IconVolumeOff />}
+                {voiceMode ? 'Voice' : 'Voice'}
+              </HeaderChip>
               {turns.length > 0 && (
                 <HeaderChip type="button" onClick={reset} title="Reset conversation">
                   <IconRefresh />
@@ -699,6 +1092,57 @@ const ChatWidget: React.FC = () => {
           </Header>
 
           <Scroller ref={scrollRef}>
+            {!voiceNoticeDismissed && voiceCaps && !voiceFullyAvailable && (
+              <VoiceNotice>
+                <IconAlert />
+                <div>
+                  <strong>Voice not available on this model.</strong>{' '}
+                  This orchestrator/instance can't transcribe or speak — switch to a
+                  voice-capable model (the active instance must be backed by an OpenAI
+                  configuration). You can keep using text in the meantime.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVoiceNoticeDismissed(true)}
+                  aria-label="Dismiss"
+                  title="Dismiss"
+                >
+                  <IconX />
+                </button>
+              </VoiceNotice>
+            )}
+            {!voiceNoticeDismissed && capsError && (
+              <VoiceNotice>
+                <IconAlert />
+                <div>
+                  <strong>Voice features unreachable.</strong> {capsError}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVoiceNoticeDismissed(true)}
+                  aria-label="Dismiss"
+                  title="Dismiss"
+                >
+                  <IconX />
+                </button>
+              </VoiceNotice>
+            )}
+            {voiceError && (
+              <VoiceNotice>
+                <IconAlert />
+                <div>
+                  <strong>Voice error.</strong> {voiceError}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVoiceError(null)}
+                  aria-label="Dismiss"
+                  title="Dismiss"
+                >
+                  <IconX />
+                </button>
+              </VoiceNotice>
+            )}
             {turns.length === 0 ? (
               <EmptyWrap>
                 <EmptyAvatar>
@@ -755,6 +1199,33 @@ const ChatWidget: React.FC = () => {
                         <span>run {turn.runId.slice(0, 8)}</span>
                         {turn.tokensIn !== null && <span>in {turn.tokensIn}</span>}
                         {turn.tokensOut !== null && <span>out {turn.tokensOut}</span>}
+                        {ttsAvailable && (() => {
+                          const speakText =
+                            (turn.output && turn.output.trim()) ||
+                            lastAssistantText(turn.steps);
+                          if (!speakText) return null;
+                          const isPlaying = playingTurnId === turn.id;
+                          const isLoading = pendingTtsTurnId === turn.id;
+                          return (
+                            <PlayChip
+                              type="button"
+                              $playing={isPlaying}
+                              disabled={isLoading}
+                              onClick={() => togglePlayTurn(turn.id, speakText)}
+                              title={isPlaying ? 'Stop speech' : 'Play reply'}
+                              aria-label={isPlaying ? 'Stop speech' : 'Play reply'}
+                            >
+                              {isLoading ? (
+                                <Spinner $size={10} />
+                              ) : isPlaying ? (
+                                <IconPause />
+                              ) : (
+                                <IconPlay />
+                              )}
+                              {isPlaying ? 'stop' : isLoading ? 'loading' : 'play'}
+                            </PlayChip>
+                          );
+                        })()}
                       </TurnFooter>
                     )}
                   </AgentColumn>
@@ -786,6 +1257,35 @@ const ChatWidget: React.FC = () => {
             >
               <IconImage />
             </AttachButton>
+            <MicButton
+              type="button"
+              data-recording={recording ? 'true' : undefined}
+              $recording={recording}
+              $busy={micBusy}
+              disabled={micDisabled}
+              onClick={handleMicClick}
+              title={
+                !sttAvailable
+                  ? "Voice unavailable on this model — switch to one that supports voice"
+                  : recording
+                    ? `Stop & ${voiceMode ? 'send' : 'transcribe'} (${formatElapsed(recorder.elapsedMs)})`
+                    : voiceMode
+                      ? 'Hold-to-talk: speak, then tap to send'
+                      : 'Record voice (tap again to stop & transcribe)'
+              }
+              aria-label={recording ? 'Stop recording' : 'Start voice recording'}
+              aria-pressed={recording}
+            >
+              {transcribing ? (
+                <Spinner $size={14} />
+              ) : recording ? (
+                <IconStop />
+              ) : sttAvailable ? (
+                <IconMic />
+              ) : (
+                <IconMicOff />
+              )}
+            </MicButton>
             <ComposerMain>
               {pending.length > 0 && (
                 <AttachmentStrip>
@@ -802,6 +1302,28 @@ const ChatWidget: React.FC = () => {
                     </ThumbWrap>
                   ))}
                 </AttachmentStrip>
+              )}
+              {recording && (
+                <RecBar>
+                  <span className="dot" />
+                  <span>recording · {formatElapsed(recorder.elapsedMs)}</span>
+                  <span style={{ marginLeft: 'auto' }}>
+                    tap mic to {voiceMode ? 'send' : 'transcribe'} · or
+                  </span>
+                  <PlayChip
+                    type="button"
+                    onClick={() => recorder.cancel()}
+                    title="Cancel recording"
+                  >
+                    <IconX /> cancel
+                  </PlayChip>
+                </RecBar>
+              )}
+              {transcribing && (
+                <RecBar>
+                  <Spinner $size={10} />
+                  <span>transcribing…</span>
+                </RecBar>
               )}
               <TextInputWrap $focused={focused} $disabled={streaming}>
                 <TextInput
@@ -835,7 +1357,7 @@ const ChatWidget: React.FC = () => {
                 )}
               </TextInputWrap>
               <Hint>
-                Enter to send · Shift+Enter newline · paste or attach images · Esc to close
+                Enter to send · Shift+Enter newline · attach images · tap mic to talk · Esc to close
               </Hint>
             </ComposerMain>
           </ComposerBar>
